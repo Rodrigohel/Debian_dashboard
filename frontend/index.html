@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Monitoramento de Rede</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; background:#F4F6FB; }
+    * { box-sizing:border-box; }
+    a { color:#2563EB; text-decoration:none; }
+    a:hover { color:#1D4ED8; text-decoration:underline; }
+    ::selection { background: rgba(37,99,235,.25); }
+
+    /* Scrollbar fina e discreta nas listas roláveis (dispositivos, eventos) */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,.55); }
+    * { scrollbar-width: thin; scrollbar-color: rgba(100,116,139,.35) transparent; }
+
+    /* Feedback tátil consistente em todo botão/controle interativo, sem
+       precisar adicionar hover manual em cada componente. */
+    button, select, input { font-family: inherit; }
+    button:not(:disabled) { transition: transform .12s ease, box-shadow .15s ease, opacity .15s ease, filter .15s ease; }
+    button:not(:disabled):active { transform: scale(.96); }
+    input, select { transition: border-color .15s ease, box-shadow .15s ease; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #2563EB !important; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+    button:focus-visible, a:focus-visible { outline: 2px solid #2563EB; outline-offset: 2px; }
+
+    @keyframes pulseDot { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+    @keyframes pulseRing { 0%{box-shadow:0 0 0 0 rgba(220,38,38,.35);} 100%{box-shadow:0 0 0 10px rgba(220,38,38,0);} }
+    @keyframes spinIcon { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+    @keyframes fadeInUp { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
+    @keyframes popIn { from{opacity:0;transform:scale(.9);} to{opacity:1;transform:scale(1);} }
+
+    /* Sidebar do dashboard: fixa ao lado do conteúdo em telas largas; vira
+       uma gaveta deslizante por cima do conteúdo em telas estreitas. */
+    .app-mobile-topbar { display: none; }
+    .app-sidebar-backdrop { display: none; }
+    @media (max-width: 880px) {
+      .app-mobile-topbar {
+        display: flex !important; position: sticky !important; top: 8px; z-index: 45;
+        box-shadow: 0 8px 24px -10px rgba(0,0,0,.4);
+      }
+      .app-sidebar {
+        position: fixed !important; left: 0; top: 0; height: 100dvh !important; z-index: 60;
+        transform: translateX(-100%); transition: transform .25s ease;
+        box-shadow: 24px 0 48px -20px rgba(0,0,0,.45);
+      }
+      .app-sidebar.is-open { transform: translateX(0); }
+      .app-sidebar-backdrop.is-open {
+        display: block; position: fixed; inset: 0; background: rgba(15,23,42,.5); z-index: 55;
+      }
+    }
+    @media (max-width: 640px) {
+      .app-main-content { padding: 16px 16px 48px !important; }
+    }
+
+    .modal-card { max-height: 85vh; }
+    @supports (height: 100dvh) {
+      .modal-card { max-height: 85dvh; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>

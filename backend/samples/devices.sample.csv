@@ -1,0 +1,8 @@
+ip,name,type,location,ports,notes
+192.168.1.10,NVR Portaria,nvr,Portaria,80;554;8000,
+192.168.1.20,Camera Entrada Principal,camera,Entrada Principal,80;554,
+192.168.1.21,Camera Garagem,camera,Garagem,80;554,
+192.168.1.30,Porteiro Bloco A,porteiro,Bloco A,80,
+192.168.1.40,Interfone Apto 101,interfone,Bloco A - Apto 101,,
+192.168.1.2,Switch Rack Principal,switch,Sala Técnica,,
+192.168.1.3,AP Corredor 1,ap,Corredor 1,,

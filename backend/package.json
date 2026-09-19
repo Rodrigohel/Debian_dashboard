@@ -1,0 +1,26 @@
+{
+  "name": "ip-dashboard-backend",
+  "version": "1.0.0",
+  "description": "Backend REST/WebSocket que monitora (ping + TCP) os IPs fixos da rede local (NVRs, câmeras, porteiros, interfones etc.) e expõe status em tempo real para o Dashboard.",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed:user": "node src/db/seedUser.js",
+    "import:devices": "node src/db/importDevices.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.4.0",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

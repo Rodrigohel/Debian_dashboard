@@ -1,0 +1,13 @@
+[Unit]
+Description=Dashboard de monitoramento de IPs - backend
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/ip-dashboard/backend
+ExecStart=/usr/bin/node src/server.js
+EnvironmentFile=/opt/ip-dashboard/backend/.env
+Restart=on-failure
+User=ip-dashboard
+
+[Install]
+WantedBy=multi-user.target

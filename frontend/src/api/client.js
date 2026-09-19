@@ -1,0 +1,140 @@
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+const WS_URL = import.meta.env.VITE_WS_URL || API_URL.replace(/^http/, 'ws') + '/ws';
+
+export const TOKEN_KEY = 'ip_dashboard_token';
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+async function request(path, options = {}) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+  });
+
+  if (res.status === 401) {
+    setToken(null);
+    const err = new Error('Não autenticado');
+    err.status = 401;
+    throw err;
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Erro ${res.status}`);
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) return res.json();
+  return res.text();
+}
+
+export function resolveAssetUrl(path) {
+  if (!path) return '';
+  return `${API_URL}${path}`;
+}
+
+export const api = {
+  login: (username, password) =>
+    request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  me: () => request('/api/auth/me'),
+
+  devices: (params = {}) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v));
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return request(`/api/devices${suffix}`);
+  },
+  deviceDetail: (id) => request(`/api/devices/${id}`),
+  createDevice: (data) => request('/api/devices', { method: 'POST', body: JSON.stringify(data) }),
+  updateDevice: (id, data) => request(`/api/devices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteDevice: (id) => request(`/api/devices/${id}`, { method: 'DELETE' }),
+  checkDeviceNow: (id) => request(`/api/devices/${id}/check`, { method: 'POST' }),
+  summary: () => request('/api/devices/summary'),
+  scanNetwork: (params) => request('/api/devices/scan', { method: 'POST', body: JSON.stringify(params || {}) }),
+  importDevices: async (file) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${API_URL}/api/devices/import`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Erro ${res.status}`);
+    }
+    return res.json();
+  },
+  exportDevicesUrl: () => {
+    const token = getToken();
+    return `${API_URL}/api/devices/export${token ? `?_t=${Date.now()}` : ''}`;
+  },
+
+  alerts: () => request('/api/alerts'),
+
+  publicDashboard: () => request('/api/public/dashboard'),
+  publicSettings: () => request('/api/public/settings'),
+
+  settings: () => request('/api/settings'),
+  updateSettings: (partial) => request('/api/settings', { method: 'PUT', body: JSON.stringify(partial) }),
+  testTelegram: (partial) => request('/api/settings/telegram/test', { method: 'POST', body: JSON.stringify(partial) }),
+  uploadLogo: async (file) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('logo', file);
+    const res = await fetch(`${API_URL}/api/settings/logo`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Erro ${res.status}`);
+    }
+    return res.json();
+  },
+
+  users: () => request('/api/users'),
+  createUser: (data) => request('/api/users', { method: 'POST', body: JSON.stringify(data) }),
+  deleteUser: (id) => request(`/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+export function connectLiveSocket(onMessage) {
+  let ws;
+  let closedByUser = false;
+
+  function connect() {
+    ws = new WebSocket(WS_URL);
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        onMessage(msg);
+      } catch {
+        // ignora mensagens malformadas
+      }
+    };
+    ws.onclose = () => {
+      if (!closedByUser) setTimeout(connect, 3000);
+    };
+    ws.onerror = () => ws.close();
+  }
+
+  connect();
+
+  return () => {
+    closedByUser = true;
+    ws && ws.close();
+  };
+}
