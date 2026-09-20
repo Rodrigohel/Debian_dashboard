@@ -17,6 +17,12 @@ export const config = {
     sqlitePath: process.env.SQLITE_PATH || './data/dashboard.db',
   },
 
+  // Chave usada só para criptografar a senha de acesso de cada equipamento
+  // (câmera/NVR/etc.) guardada no banco — nunca fica em texto puro no
+  // SQLite. Igual ao JWT_SECRET, o install.sh gera um valor aleatório real
+  // no .env de produção; o padrão abaixo é só para desenvolvimento local.
+  credentialsKey: process.env.CREDENTIALS_KEY || 'dev-credentials-key-change-me',
+
   // Valores iniciais de monitoramento/alertas — depois que alguém salvar
   // pela tela de Configurações, o valor no banco (settingsService) manda,
   // sem precisar reiniciar o backend.

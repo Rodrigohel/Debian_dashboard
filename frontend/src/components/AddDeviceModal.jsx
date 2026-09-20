@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { TYPE_META } from './Icon.jsx';
 
 export default function AddDeviceModal({ colors, onClose, onCreate }) {
-  const [form, setForm] = useState({ ip: '', name: '', type: 'outro', location: '', ports: '', notes: '' });
+  const [form, setForm] = useState({ ip: '', name: '', type: 'outro', location: '', ports: '', notes: '', username: '', password: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -51,6 +51,16 @@ export default function AddDeviceModal({ colors, onClose, onCreate }) {
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Portas TCP (opcional, separadas por vírgula)</label>
             <input value={form.ports} onChange={(e) => setForm({ ...form, ports: e.target.value })} placeholder="ex.: 80, 554" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Usuário de acesso (opcional)</label>
+              <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="admin" autoComplete="off" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Senha de acesso (opcional)</label>
+              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••" autoComplete="off" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
+            </div>
           </div>
         </div>
 

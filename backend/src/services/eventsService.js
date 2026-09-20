@@ -47,3 +47,43 @@ export function getEventsHistory({ deviceId, eventType, from, to, limit = 200 } 
     durationMs: row.prevAt ? new Date(row.at).getTime() - new Date(row.prevAt).getTime() : null,
   }));
 }
+
+const lastEventBeforeStmt = db.prepare(`
+  SELECT event_type AS eventType FROM device_events
+  WHERE device_id = ? AND at < ? AND event_type IN ('went_offline', 'went_online')
+  ORDER BY at DESC LIMIT 1
+`);
+const eventsInWindowStmt = db.prepare(`
+  SELECT event_type AS eventType, at FROM device_events
+  WHERE device_id = ? AND at >= ? AND event_type IN ('went_offline', 'went_online')
+  ORDER BY at ASC
+`);
+
+/**
+ * % do período em que o dispositivo respondeu ping (offline por "degradado"
+ * não conta contra o uptime — o equipamento está na rede, só o serviço numa
+ * porta específica é que não respondeu). Sem nenhum evento no histórico,
+ * assume 100% (não há registro de queda) em vez de penalizar equipamento
+ * que nunca caiu.
+ */
+export function getDeviceUptime(deviceId, days = 7) {
+  const windowMs = days * 86400 * 1000;
+  const windowStart = new Date(Date.now() - windowMs);
+  const windowStartIso = windowStart.toISOString();
+
+  const before = lastEventBeforeStmt.get(deviceId, windowStartIso);
+  let state = before?.eventType === 'went_offline' ? 'offline' : 'online';
+  let cursor = windowStart.getTime();
+  let offlineMs = 0;
+
+  for (const ev of eventsInWindowStmt.all(deviceId, windowStartIso)) {
+    const at = new Date(ev.at).getTime();
+    if (state === 'offline') offlineMs += at - cursor;
+    cursor = at;
+    state = ev.eventType === 'went_online' ? 'online' : 'offline';
+  }
+  if (state === 'offline') offlineMs += Date.now() - cursor;
+
+  const uptimePercent = Math.max(0, Math.min(100, 100 * (1 - offlineMs / windowMs)));
+  return { days, uptimePercent: Math.round(uptimePercent * 100) / 100, offlineMs };
+}

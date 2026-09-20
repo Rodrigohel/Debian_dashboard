@@ -15,6 +15,9 @@ import LoadingScreen from '../components/LoadingScreen.jsx';
 import NetworkHistoryChart from '../components/NetworkHistoryChart.jsx';
 import ServerHealthPanel from '../components/ServerHealthPanel.jsx';
 import HistoryPanel from '../components/HistoryPanel.jsx';
+import ToastContainer from '../components/ToastContainer.jsx';
+import CommandPalette from '../components/CommandPalette.jsx';
+import { showToast } from '../utils/toast.js';
 
 const THEME_KEY = 'ip_dashboard_theme';
 const POLL_MS = 15000;
@@ -120,6 +123,17 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     await loadAll();
   }
 
+  async function handleToggleFavorite(id, favorite) {
+    setDevices((current) => current.map((d) => (d.id === id ? { ...d, favorite } : d)));
+    if (selectedDevice?.id === id) setSelectedDevice((d) => ({ ...d, favorite }));
+    try {
+      await api.toggleFavorite(id, favorite);
+    } catch (err) {
+      showToast(`Erro ao favoritar: ${err.message}`, 'error');
+      await loadAll();
+    }
+  }
+
   async function handleCheckNow(id) {
     setCheckingId(id);
     try {
@@ -148,9 +162,9 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
       const result = await api.identifyAll();
       await loadAll();
       const offlineNote = result.offline > 0 ? `\n${result.offline} estavam offline no momento — MAC só é possível para quem responde à rede.` : '';
-      alert(`Identificação concluída: ${result.processed} verificados — ${result.withMac} com MAC, ${result.withVendor} com fabricante, ${result.withModel} com modelo.${offlineNote}`);
+      showToast(`Identificação concluída: ${result.processed} verificados — ${result.withMac} com MAC, ${result.withVendor} com fabricante, ${result.withModel} com modelo.${offlineNote}`, 'success');
     } catch (err) {
-      alert(`Erro ao identificar: ${err.message}`);
+      showToast(`Erro ao identificar: ${err.message}`, 'error');
     } finally {
       setIdentifyingAll(false);
     }
@@ -167,9 +181,9 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     try {
       const result = await api.scanNetwork({});
       await loadAll();
-      alert(`Varredura concluída: ${result.respondingCount} IPs responderam, ${result.createdCount} novos cadastrados e identificados automaticamente (confira nome/tipo/local na lista).`);
+      showToast(`Varredura concluída: ${result.respondingCount} IPs responderam, ${result.createdCount} novos cadastrados e identificados automaticamente (confira nome/tipo/local na lista).`, 'success');
     } catch (err) {
-      alert(`Erro na varredura: ${err.message}`);
+      showToast(`Erro na varredura: ${err.message}`, 'error');
     } finally {
       setScanning(false);
     }
@@ -180,9 +194,9 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     try {
       const result = await api.importDevices(file);
       await loadAll();
-      alert(`Importação concluída: ${result.processed} processados, ${result.errors.length} com erro.`);
+      showToast(`Importação concluída: ${result.processed} processados, ${result.errors.length} com erro.`, result.errors.length > 0 ? 'info' : 'success');
     } catch (err) {
-      alert(`Erro ao importar: ${err.message}`);
+      showToast(`Erro ao importar: ${err.message}`, 'error');
     } finally {
       setImporting(false);
     }
@@ -192,7 +206,7 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     try {
       await api.exportDevicesCsv();
     } catch (err) {
-      alert(`Erro ao exportar CSV: ${err.message}`);
+      showToast(`Erro ao exportar CSV: ${err.message}`, 'error');
     }
   }
 
@@ -200,7 +214,7 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     try {
       await api.exportDevicesPdf();
     } catch (err) {
-      alert(`Erro ao exportar PDF: ${err.message}`);
+      showToast(`Erro ao exportar PDF: ${err.message}`, 'error');
     }
   }
 
@@ -315,6 +329,7 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
             onExportCsv={handleExportCsv}
             onExportPdf={handleExportPdf}
             onIdentifyAll={handleIdentifyAll}
+            onToggleFavorite={handleToggleFavorite}
             scanning={scanning}
             importing={importing}
             identifying={identifyingAll}
@@ -363,10 +378,14 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
           onDelete={handleDeleteDevice}
           onCheckNow={handleCheckNow}
           onIdentifyNow={handleIdentifyNow}
+          onToggleFavorite={handleToggleFavorite}
           checking={checkingId === selectedDevice.id}
           identifying={identifyingId === selectedDevice.id}
         />
       )}
+
+      <CommandPalette colors={colors} devices={devices} onSelectDevice={handleSelectDevice} />
+      <ToastContainer colors={colors} />
     </div>
   );
 }

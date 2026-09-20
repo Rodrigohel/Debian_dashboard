@@ -48,6 +48,23 @@ público opcional.
 - **Configurações**: tudo num só lugar — identidade (nome/logo), intervalo
   e timeout do ping, limiar de falhas para marcar offline, prefixo de rede
   do "Escanear rede", retenção do histórico, lembrete de alerta e Telegram.
+- **Acesso do equipamento**: guarde usuário/senha da interface web de cada
+  câmera/NVR/porteiro no próprio cadastro (aba de detalhe do dispositivo) —
+  senha **criptografada em repouso** (AES-256-GCM), nunca aparece em CSV/PDF
+  nem na listagem, e só é descriptografada na tela de detalhe de UM
+  dispositivo por vez. Tem botão de copiar, mostrar/ocultar e um atalho
+  "Abrir interface web" que já abre o IP do equipamento em nova aba.
+- **Favoritos**: marque os dispositivos mais importantes com a estrela (na
+  tabela ou no detalhe) e filtre só por eles — útil com ~230 IPs na lista.
+- **Uptime por dispositivo**: cada detalhe mostra o **% de tempo no ar nos
+  últimos 7 dias**, calculado a partir do histórico real de queda/
+  recuperação.
+- **Busca rápida (Ctrl/Cmd+K)**: paleta de comando para pular direto para
+  qualquer dispositivo por nome, IP, MAC, fabricante ou local, sem precisar
+  rolar a tabela.
+- **Notificações no próprio painel**: ações como escanear, identificar,
+  exportar ou importar mostram um aviso discreto (toast) no canto da tela,
+  em vez de um alerta bloqueante do navegador.
 
 ## Instalação — um único comando
 
@@ -185,6 +202,7 @@ depende só do ping.
 | Notificação por Telegram | Tela de Configurações (Bot Token + Chat ID, com botão de teste) |
 | Quais cards aparecem no painel público (sem login) | `backend/.env` → `PUBLIC_SHOW_*` (reiniciar o backend depois de mudar) |
 | Prefixo de rede usado pelo "Escanear rede" | `backend/.env` → `NETWORK_BASE` |
+| Chave de criptografia das senhas de equipamento salvas | `backend/.env` → `CREDENTIALS_KEY` (gerada automaticamente pelo `install.sh`; nunca comitar/perder — trocá-la invalida as senhas já salvas) |
 
 ## Endpoints do backend
 
@@ -200,6 +218,8 @@ depende só do ping.
 - `POST /api/devices/import` / `GET /api/devices/export` — CSV em massa.
 - `GET /api/devices/export/pdf` — relatório em PDF de todos os dispositivos.
 - `POST /api/devices/:id/check` — força uma verificação de ping imediata.
+- `POST /api/devices/:id/favorite` — marca/desmarca um dispositivo como
+  favorito.
 - `POST /api/devices/:id/identify` / `POST /api/devices/identify-all` — MAC,
   fabricante e modelo (ONVIF/SSDP/HTTP).
 - `GET /api/alerts` — histórico de alertas ativos/resolvidos.

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireAdmin } from '../middleware/auth.js';
 import {
-  listDevices, getDevice, createDevice, updateDevice, deleteDevice, upsertDeviceByIp, getSummary, DEVICE_TYPES,
+  listDevices, getDevice, createDevice, updateDevice, deleteDevice, upsertDeviceByIp, getSummary, setFavorite, DEVICE_TYPES,
 } from '../services/devicesService.js';
 import { scanNetwork } from '../services/scanService.js';
 import { runMonitorCycle } from '../services/monitorService.js';
@@ -91,6 +91,12 @@ devicesRouter.put('/:id', requireAdmin, (req, res) => {
 devicesRouter.delete('/:id', requireAdmin, (req, res) => {
   deleteDevice(Number(req.params.id));
   res.status(204).end();
+});
+
+devicesRouter.post('/:id/favorite', (req, res) => {
+  const device = getDevice(Number(req.params.id));
+  if (!device) return res.status(404).json({ error: 'Dispositivo não encontrado.' });
+  res.json(setFavorite(device.id, req.body?.favorite !== false));
 });
 
 // Verificação avulsa de um dispositivo específico, sem esperar a próxima

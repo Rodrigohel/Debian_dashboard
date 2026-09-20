@@ -9,6 +9,7 @@ const STATUS_META = {
 };
 
 const COLUMNS = [
+  { key: 'favorite', label: '' },
   { key: 'status', label: 'Status' },
   { key: 'name', label: 'Nome' },
   { key: 'ip', label: 'IP' },
@@ -27,6 +28,7 @@ function ipToNumber(ip) {
 
 function sortValue(device, key) {
   switch (key) {
+    case 'favorite': return device.favorite ? 0 : 1;
     case 'ip': return ipToNumber(device.ip);
     case 'latencyMs': return device.latencyMs ?? -1;
     case 'lastCheckAt': return device.lastCheckAt ? new Date(device.lastCheckAt).getTime() : 0;
@@ -99,12 +101,13 @@ function FilterChip({ colors, active, onClick, label, count, color }) {
 }
 
 export default function DevicesPanel({
-  colors, devices, onSelectDevice, onAddDevice, onScan, onImport, onExportCsv, onExportPdf, onIdentifyAll,
+  colors, devices, onSelectDevice, onAddDevice, onScan, onImport, onExportCsv, onExportPdf, onIdentifyAll, onToggleFavorite,
   scanning, importing, identifying,
 }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState(null);
   const [vendorFilter, setVendorFilter] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState({ key: 'type', dir: 1 });
   const fileInputRef = useRef(null);
@@ -130,6 +133,7 @@ export default function DevicesPanel({
       if (statusFilter !== 'all' && d.status !== statusFilter) return false;
       if (typeFilter && d.type !== typeFilter) return false;
       if (vendorFilter && d.vendor !== vendorFilter) return false;
+      if (favoritesOnly && !d.favorite) return false;
       if (needle && !(d.name.toLowerCase().includes(needle) || d.ip.includes(needle) || d.location.toLowerCase().includes(needle) || (d.mac || '').includes(needle))) return false;
       return true;
     });
@@ -141,7 +145,7 @@ export default function DevicesPanel({
       return 0;
     });
     return sorted;
-  }, [devices, statusFilter, typeFilter, vendorFilter, search, sort]);
+  }, [devices, statusFilter, typeFilter, vendorFilter, favoritesOnly, search, sort]);
 
   function toggleSort(key) {
     setSort((current) => (current.key === key ? { key, dir: -current.dir } : { key, dir: 1 }));
@@ -187,6 +191,7 @@ export default function DevicesPanel({
         <FilterChip colors={colors} active={statusFilter === 'online'} onClick={() => setStatusFilter('online')} label="Online" count={counts.status.online || 0} color={colors.green} />
         <FilterChip colors={colors} active={statusFilter === 'offline'} onClick={() => setStatusFilter('offline')} label="Offline" count={counts.status.offline || 0} color={colors.red} />
         <FilterChip colors={colors} active={statusFilter === 'degraded'} onClick={() => setStatusFilter('degraded')} label="Degradado" count={counts.status.degraded || 0} color={colors.amber} />
+        <FilterChip colors={colors} active={favoritesOnly} onClick={() => setFavoritesOnly((v) => !v)} label="★ Favoritos" count={devices.filter((d) => d.favorite).length} color={colors.amber} />
       </div>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
@@ -247,6 +252,15 @@ export default function DevicesPanel({
                   onMouseEnter={(e) => { e.currentTarget.style.background = colors.bgCardAlt; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
+                  <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => onToggleFavorite(d.id, !d.favorite)}
+                      title={d.favorite ? 'Remover dos favoritos' : 'Marcar como favorito'}
+                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4, display: 'flex' }}
+                    >
+                      <Icon paths={ICONS.starFilled} size={15} strokeWidth={1.8} color={d.favorite ? colors.amber : colors.border} />
+                    </button>
+                  </td>
                   <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}><StatusDot colors={colors} status={d.status} /></td>
                   <td style={{ padding: '10px 14px', fontWeight: 600, color: colors.textPrimary, whiteSpace: 'nowrap' }}>{d.name}</td>
                   <td style={{ padding: '10px 14px', color: colors.textSecondary, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{d.ip}</td>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
+import { showToast } from '../utils/toast.js';
 import Icon, { ICONS } from './Icon.jsx';
 
 function Field({ colors, label, children, hint }) {
@@ -125,13 +126,14 @@ function UsersTab({ colors, currentUsername }) {
   }
 
   async function handleDelete(id, username) {
-    if (username === currentUsername) return alert('Você não pode remover o próprio usuário logado.');
+    if (username === currentUsername) return showToast('Você não pode remover o próprio usuário logado.', 'error');
     if (!confirm(`Remover o usuário "${username}"?`)) return;
     try {
       await api.deleteUser(id);
       load();
+      showToast(`Usuário "${username}" removido.`, 'success');
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, 'error');
     }
   }
 

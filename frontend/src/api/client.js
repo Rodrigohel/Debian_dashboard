@@ -93,6 +93,7 @@ export const api = {
   updateDevice: (id, data) => request(`/api/devices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteDevice: (id) => request(`/api/devices/${id}`, { method: 'DELETE' }),
   checkDeviceNow: (id) => request(`/api/devices/${id}/check`, { method: 'POST' }),
+  toggleFavorite: (id, favorite) => request(`/api/devices/${id}/favorite`, { method: 'POST', body: JSON.stringify({ favorite }) }),
   identifyDevice: (id) => request(`/api/devices/${id}/identify`, { method: 'POST' }),
   identifyAll: (ids) => request('/api/devices/identify-all', { method: 'POST', body: JSON.stringify({ ids }) }),
   summary: () => request('/api/devices/summary'),

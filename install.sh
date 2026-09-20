@@ -162,9 +162,11 @@ if [ ! -f .env ]; then
   FIRST_INSTALL=1
   cp .env.example .env
   JWT_SECRET="$(openssl rand -hex 32)"
+  CREDENTIALS_KEY="$(openssl rand -hex 32)"
   sed -i "s#^PORT=.*#PORT=$BACKEND_PORT#" .env
   sed -i "s#^NETWORK_BASE=.*#NETWORK_BASE=$NETWORK_BASE#" .env
   sed -i "s#^JWT_SECRET=.*#JWT_SECRET=$JWT_SECRET#" .env
+  sed -i "s#^CREDENTIALS_KEY=.*#CREDENTIALS_KEY=$CREDENTIALS_KEY#" .env
   sed -i "s#^DEFAULT_COMPANY_NAME=.*#DEFAULT_COMPANY_NAME=$COMPANY_NAME#" .env
   sed -i "s#^DEFAULT_SITE_NAME=.*#DEFAULT_SITE_NAME=$SITE_NAME#" .env
   # CORS só importa se algo acessar a API vindo de outra origem — o modo
@@ -172,9 +174,16 @@ if [ ! -f .env ]; then
   # same-origin, então liberar geral aqui é seguro (a API continua exigindo
   # login/JWT para tudo que não é público).
   sed -i "s#^CORS_ORIGIN=.*#CORS_ORIGIN=*#" .env
-  info ".env criado com um JWT_SECRET novo e aleatório."
+  info ".env criado com um JWT_SECRET e CREDENTIALS_KEY novos e aleatórios."
 else
   info ".env já existia — mantido sem alterações (edite manualmente se quiser mudar algo)."
+  # Instalações feitas antes do recurso de credenciais de dispositivo não têm
+  # essa chave — adiciona automaticamente para não deixar a criptografia sem
+  # chave (o que faria decryptSecret sempre falhar silenciosamente).
+  if ! grep -q '^CREDENTIALS_KEY=' .env; then
+    echo "CREDENTIALS_KEY=$(openssl rand -hex 32)" >> .env
+    info "CREDENTIALS_KEY adicionada ao .env existente (necessária para as credenciais de dispositivo)."
+  fi
 fi
 
 if [ ! -f data/dashboard.db ]; then

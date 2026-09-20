@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon, { ICONS, TYPE_META } from './Icon.jsx';
+import { showToast } from '../utils/toast.js';
 
 const STATUS_META = {
   online: { label: 'Online', color: 'green' },
@@ -55,18 +56,29 @@ function discoveryHints(discoveryInfo) {
   return hints;
 }
 
+function copyToClipboard(text, label) {
+  if (!text) return;
+  navigator.clipboard?.writeText(text).then(
+    () => showToast(`${label} copiado.`, 'success'),
+    () => showToast('Não foi possível copiar — copie manualmente.', 'error'),
+  );
+}
+
 export default function DeviceDetailModal({
-  colors, device, onClose, onSave, onDelete, onCheckNow, onIdentifyNow, checking, identifying,
+  colors, device, onClose, onSave, onDelete, onCheckNow, onIdentifyNow, onToggleFavorite, checking, identifying,
 }) {
   const [form, setForm] = useState({
     name: device.name, type: device.type, location: device.location,
     ports: device.ports.join(', '), notes: device.notes, enabled: device.enabled,
     mac: device.mac || '', vendor: device.vendor || '', model: device.model || '',
+    username: device.username || '', password: device.password || '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const statusMeta = STATUS_META[device.status] || STATUS_META.unknown;
   const hints = discoveryHints(device.discoveryInfo);
+  const webUrl = `http://${device.ip}${device.ports?.[0] && device.ports[0] !== 80 ? `:${device.ports[0]}` : ''}`;
 
   async function handleSave() {
     setSaving(true);
@@ -91,13 +103,25 @@ export default function DeviceDetailModal({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <Icon paths={(TYPE_META[device.type] || TYPE_META.outro).icon} size={20} color={colors.textSecondary} strokeWidth={2} />
-          <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 18, color: colors.textPrimary }}>{device.name}</div>
+          <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 18, color: colors.textPrimary, flex: 1 }}>{device.name}</div>
+          {onToggleFavorite && (
+            <button
+              onClick={() => onToggleFavorite(device.id, !device.favorite)}
+              title={device.favorite ? 'Remover dos favoritos' : 'Marcar como favorito'}
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4, display: 'flex', marginRight: 14 }}
+            >
+              <Icon paths={ICONS.starFilled} size={19} strokeWidth={1.8} color={device.favorite ? colors.amber : colors.border} />
+            </button>
+          )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, fontSize: 13, color: colors.textSecondary }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, fontSize: 13, color: colors.textSecondary, flexWrap: 'wrap' }}>
           <span style={{ fontFamily: 'monospace' }}>{device.ip}</span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 700, color: colors[statusMeta.color] }}>
             <span style={{ width: 7, height: 7, borderRadius: 99, background: colors[statusMeta.color] }} /> {statusMeta.label}
           </span>
+          {typeof device.uptime7d === 'number' && (
+            <span style={{ color: colors.textTertiary, fontSize: 12.5 }}>· Uptime 7 dias: <strong style={{ color: colors.textSecondary }}>{device.uptime7d}%</strong></span>
+          )}
         </div>
 
         <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
@@ -138,6 +162,74 @@ export default function DeviceDetailModal({
               ))}
             </div>
           )}
+        </div>
+
+        <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em' }}>Acesso do equipamento</div>
+            <a
+              href={webUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: colors.primary, textDecoration: 'none' }}
+            >
+              <Icon paths={ICONS.externalLink} size={13} strokeWidth={2.2} /> Abrir interface web
+            </a>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Usuário</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input
+                  value={form.username}
+                  onChange={(e) => setForm({ ...form, username: e.target.value })}
+                  placeholder="admin"
+                  autoComplete="off"
+                  style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(form.username, 'Usuário')}
+                  title="Copiar usuário"
+                  style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
+                  <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
+                </button>
+              </div>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Senha</label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="••••••"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="off"
+                  style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
+                  <Icon paths={showPassword ? ICONS.eyeOff : ICONS.eye} size={13} strokeWidth={2} color={colors.textSecondary} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(form.password, 'Senha')}
+                  title="Copiar senha"
+                  style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
+                  <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
+                </button>
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: colors.textTertiary }}>
+            Guardado de forma criptografada — visível apenas nesta tela.
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>

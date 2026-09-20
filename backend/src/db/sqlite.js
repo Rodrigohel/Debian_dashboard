@@ -34,6 +34,9 @@ db.exec(`
     vendor TEXT NOT NULL DEFAULT '',         -- fabricante a partir do MAC (base IEEE OUI)
     model TEXT NOT NULL DEFAULT '',          -- modelo, via ONVIF/SSDP/HTTP (best-effort)
     discovery_info TEXT NOT NULL DEFAULT '{}', -- JSON bruto com tudo que os probes acharam
+    device_username TEXT NOT NULL DEFAULT '',     -- login de acesso ao próprio equipamento
+    device_password_enc TEXT NOT NULL DEFAULT '', -- senha de acesso, criptografada (ver cryptoService)
+    favorite INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -114,6 +117,9 @@ for (const [column, ddl] of [
   ['vendor', "ALTER TABLE devices ADD COLUMN vendor TEXT NOT NULL DEFAULT ''"],
   ['model', "ALTER TABLE devices ADD COLUMN model TEXT NOT NULL DEFAULT ''"],
   ['discovery_info', "ALTER TABLE devices ADD COLUMN discovery_info TEXT NOT NULL DEFAULT '{}'"],
+  ['device_username', "ALTER TABLE devices ADD COLUMN device_username TEXT NOT NULL DEFAULT ''"],
+  ['device_password_enc', "ALTER TABLE devices ADD COLUMN device_password_enc TEXT NOT NULL DEFAULT ''"],
+  ['favorite', 'ALTER TABLE devices ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0'],
 ]) {
   if (!deviceColumns.includes(column)) db.exec(ddl);
 }
