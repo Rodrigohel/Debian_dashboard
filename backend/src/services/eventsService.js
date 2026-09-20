@@ -48,6 +48,27 @@ export function getEventsHistory({ deviceId, eventType, from, to, limit = 200 } 
   }));
 }
 
+const flappiestStmt = db.prepare(`
+  SELECT d.id, d.name, d.ip, d.type, d.location, COUNT(*) AS drops
+  FROM device_events e
+  JOIN devices d ON d.id = e.device_id
+  WHERE e.event_type = 'went_offline' AND e.at >= @since
+  GROUP BY d.id
+  ORDER BY drops DESC
+  LIMIT @limit
+`);
+
+/**
+ * Ranking dos dispositivos que mais caíram num período — em ~230 IPs, quase
+ * sempre são uns poucos "problemáticos" (cabo solto, PoE fraco, Wi-Fi
+ * ruim) respondendo pela maior parte dos alertas. Ajuda a ir direto neles
+ * em vez de vasculhar a lista inteira.
+ */
+export function getFlappiestDevices(hours = 24, limit = 5) {
+  const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+  return flappiestStmt.all({ since, limit });
+}
+
 const lastEventBeforeStmt = db.prepare(`
   SELECT event_type AS eventType FROM device_events
   WHERE device_id = ? AND at < ? AND event_type IN ('went_offline', 'went_online')

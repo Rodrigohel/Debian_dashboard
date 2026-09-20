@@ -13,6 +13,8 @@ import AlertsPanel from '../components/AlertsPanel.jsx';
 import SettingsModal from '../components/SettingsModal.jsx';
 import LoadingScreen from '../components/LoadingScreen.jsx';
 import NetworkHistoryChart from '../components/NetworkHistoryChart.jsx';
+import LatencyChart from '../components/LatencyChart.jsx';
+import TopIssues from '../components/TopIssues.jsx';
 import ServerHealthPanel from '../components/ServerHealthPanel.jsx';
 import HistoryPanel from '../components/HistoryPanel.jsx';
 import ToastContainer from '../components/ToastContainer.jsx';
@@ -336,8 +338,10 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
           />
         </div>
 
-        <div ref={chartSectionRef} style={{ ...reveal(2), scrollMarginTop: 20 }}>
+        <div ref={chartSectionRef} style={{ ...reveal(2), scrollMarginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <NetworkHistoryChart colors={colors} />
+          <LatencyChart colors={colors} />
+          <TopIssues colors={colors} devices={devices} icons={ICONS} />
         </div>
 
         <div style={{ ...reveal(3), display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(380px,100%),1fr))', gap: 16, alignItems: 'start' }}>

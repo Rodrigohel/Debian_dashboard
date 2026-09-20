@@ -40,6 +40,13 @@ público opcional.
 - **Análise de rede**: gráfico "Saúde da rede ao longo do tempo" (online /
   degradado / offline empilhados, 6h a 30 dias) com latência média do
   período e tooltip ao passar o mouse.
+- **Latência da rede**: gráfico dedicado com a **mediana** da latência de
+  todos os dispositivos e uma faixa até o **p95** (mostra os picos sem deixar
+  1 equipamento ruim isolado distorcer a leitura), mesmo seletor de período e
+  tooltip com mediana/p95/máxima/média no ponto.
+- **Destaques**: dois rankings automáticos logo abaixo dos gráficos —
+  **"Mais instáveis (24h)"** (quem mais caiu) e **"Maior latência agora"** —
+  pra ir direto no equipamento problemático em vez de vasculhar ~230 IPs.
 - **Saúde do servidor**: CPU, memória, disco e uptime da própria máquina que
   roda o painel (aba "Servidor").
 - **Usuários**: crie/remova outros logins pela tela de Configurações → aba
@@ -226,8 +233,10 @@ depende só do ping.
 - `GET /api/history` — eventos de queda/recuperação com duração calculada
   (filtros: `deviceId`, `eventType`, `from`, `to`, `limit`).
 - `GET /api/stats/network-history?hours=N` — série da rede (online/offline/
-  degradado + latência média) para o gráfico de análise.
+  degradado + latência média/mediana/p95/máxima) para os gráficos de análise.
 - `GET /api/stats/server-health` — CPU, memória, disco e uptime do servidor.
+- `GET /api/stats/flappiest?hours=24&limit=5` — ranking dos dispositivos que
+  mais caíram no período.
 - `GET/POST/DELETE /api/users` — gestão de usuários do painel (admin).
 - `GET/PUT /api/settings`, `POST /api/settings/telegram/test` — configuração.
 - WebSocket em `/ws` — push do status de todos os dispositivos a cada rodada

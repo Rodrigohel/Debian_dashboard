@@ -124,6 +124,7 @@ export const api = {
 
   networkHistory: (hours) => request(`/api/stats/network-history?hours=${hours}`),
   serverHealth: () => request('/api/stats/server-health'),
+  flappiestDevices: (hours = 24, limit = 5) => request(`/api/stats/flappiest?hours=${hours}&limit=${limit}`),
 
   publicDashboard: () => request('/api/public/dashboard'),
   publicSettings: () => request('/api/public/settings'),

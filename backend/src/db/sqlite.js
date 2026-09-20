@@ -102,7 +102,10 @@ db.exec(`
     online INTEGER NOT NULL,
     offline INTEGER NOT NULL,
     degraded INTEGER NOT NULL,
-    avg_latency_ms REAL
+    avg_latency_ms REAL,
+    p50_latency_ms REAL, -- mediana da latência de todos os dispositivos naquela rodada
+    p95_latency_ms REAL, -- percentil 95 (mostra os picos, sem deixar 1 outlier dominar como o máximo bruto)
+    max_latency_ms REAL
   );
   CREATE INDEX IF NOT EXISTS idx_network_history_at ON network_history(at DESC);
 `);
@@ -122,4 +125,13 @@ for (const [column, ddl] of [
   ['favorite', 'ALTER TABLE devices ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0'],
 ]) {
   if (!deviceColumns.includes(column)) db.exec(ddl);
+}
+
+const networkHistoryColumns = db.prepare('PRAGMA table_info(network_history)').all().map((c) => c.name);
+for (const [column, ddl] of [
+  ['p50_latency_ms', 'ALTER TABLE network_history ADD COLUMN p50_latency_ms REAL'],
+  ['p95_latency_ms', 'ALTER TABLE network_history ADD COLUMN p95_latency_ms REAL'],
+  ['max_latency_ms', 'ALTER TABLE network_history ADD COLUMN max_latency_ms REAL'],
+]) {
+  if (!networkHistoryColumns.includes(column)) db.exec(ddl);
 }
