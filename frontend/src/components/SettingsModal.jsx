@@ -51,6 +51,9 @@ function GeneralTab({ colors, form, setForm }) {
       <Field colors={colors} label="Logo (PNG, JPG ou SVG)">
         <input type="file" accept="image/*" onChange={(e) => setForm({ ...form, logoFile: e.target.files?.[0] || null })} style={inputStyle(colors)} />
       </Field>
+      <Field colors={colors} label="Planta baixa (opcional)" hint="Usada no painel 'Planta baixa' pra posicionar cada dispositivo visualmente sobre a imagem do prédio/condomínio.">
+        <input type="file" accept="image/*" onChange={(e) => setForm({ ...form, floorPlanFile: e.target.files?.[0] || null })} style={inputStyle(colors)} />
+      </Field>
 
       <SectionLabel colors={colors}>Monitoramento</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -213,6 +216,7 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
     telegramChatId: settings.telegramChatId || '',
     executiveReportFrequency: settings.executiveReportFrequency || 'off',
     logoFile: null,
+    floorPlanFile: null,
   });
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -226,6 +230,7 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
     try {
       await api.updateSettings(form);
       if (form.logoFile) await api.uploadLogo(form.logoFile);
+      if (form.floorPlanFile) await api.uploadFloorPlan(form.floorPlanFile);
       await onSaved();
       setMessage('Configurações salvas.');
     } catch (err) {

@@ -19,6 +19,7 @@ import IncidentStreakBanner from '../components/IncidentStreakBanner.jsx';
 import ExecutiveReportButton from '../components/ExecutiveReportButton.jsx';
 import LocationHealthPanel from '../components/LocationHealthPanel.jsx';
 import TvMode from '../components/TvMode.jsx';
+import FloorPlanPanel from '../components/FloorPlanPanel.jsx';
 import ServerHealthPanel from '../components/ServerHealthPanel.jsx';
 import HistoryPanel from '../components/HistoryPanel.jsx';
 import ToastContainer from '../components/ToastContainer.jsx';
@@ -64,6 +65,7 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
   const devicesSectionRef = useRef(null);
   const alertsSectionRef = useRef(null);
   const chartSectionRef = useRef(null);
+  const floorPlanSectionRef = useRef(null);
   const historySectionRef = useRef(null);
   const serverSectionRef = useRef(null);
 
@@ -162,6 +164,16 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
       await api.toggleFavorite(id, favorite);
     } catch (err) {
       showToast(`Erro ao favoritar: ${err.message}`, 'error');
+      await loadAll();
+    }
+  }
+
+  async function handleSetFloorPosition(id, x, y) {
+    setDevices((current) => current.map((d) => (d.id === id ? { ...d, floorX: x, floorY: y } : d)));
+    try {
+      await api.setFloorPosition(id, x, y);
+    } catch (err) {
+      showToast(`Erro ao posicionar na planta: ${err.message}`, 'error');
       await loadAll();
     }
   }
@@ -289,6 +301,7 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     { key: 'overview', label: 'Visão geral', icon: ICONS.network, onClick: () => topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
     { key: 'devices', label: 'Dispositivos', icon: ICONS.server, onClick: () => scrollToSection(devicesSectionRef) },
     { key: 'chart', label: 'Análise de rede', icon: ICONS.clock, onClick: () => scrollToSection(chartSectionRef) },
+    { key: 'floorplan', label: 'Planta baixa', icon: ICONS.map, onClick: () => scrollToSection(floorPlanSectionRef) },
     { key: 'alerts', label: 'Alertas', icon: ICONS.warningTriangle, onClick: () => scrollToSection(alertsSectionRef) },
     { key: 'history', label: 'Histórico', icon: ICONS.clock, onClick: () => scrollToSection(historySectionRef) },
     { key: 'server', label: 'Servidor', icon: ICONS.server, onClick: () => scrollToSection(serverSectionRef) },
@@ -389,6 +402,17 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
           <LatencyChart colors={colors} />
           <LocationHealthPanel colors={colors} devices={devices} />
           <TopIssues colors={colors} devices={devices} icons={ICONS} />
+        </div>
+
+        <div ref={floorPlanSectionRef} style={{ ...reveal(3), scrollMarginTop: 20 }}>
+          <FloorPlanPanel
+            colors={colors}
+            devices={devices}
+            floorPlanUrl={settings.floorPlanUrl}
+            isAdmin={user?.role === 'admin'}
+            onSelectDevice={handleSelectDevice}
+            onPositionChange={handleSetFloorPosition}
+          />
         </div>
 
         <div style={{ ...reveal(3), display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(380px,100%),1fr))', gap: 16, alignItems: 'start' }}>

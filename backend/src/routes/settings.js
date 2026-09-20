@@ -124,3 +124,27 @@ settingsRouter.post('/logo', (req, res) => {
     res.json(setSettings({ logoUrl }));
   });
 });
+
+const floorPlanUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => cb(null, `floorplan${path.extname(file.originalname).toLowerCase() || '.png'}`),
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      cb(new Error('Envie um arquivo de imagem (PNG, JPG ou SVG).'));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+settingsRouter.post('/floorplan', (req, res) => {
+  floorPlanUpload.single('floorplan')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    const floorPlanUrl = `/api/uploads/${req.file.filename}`;
+    res.json(setSettings({ floorPlanUrl }));
+  });
+});

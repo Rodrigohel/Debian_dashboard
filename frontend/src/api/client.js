@@ -152,6 +152,21 @@ export const api = {
     }
     return res.json();
   },
+  uploadFloorPlan: async (file) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('floorplan', file);
+    const res = await fetch(`${API_URL}/api/settings/floorplan`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Erro ${res.status}`);
+    }
+    return res.json();
+  },
 
   users: () => request('/api/users'),
   createUser: (data) => request('/api/users', { method: 'POST', body: JSON.stringify(data) }),

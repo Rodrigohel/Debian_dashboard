@@ -63,6 +63,31 @@ público opcional.
   tooltip mostrando a data exata. Mostra padrões que um número sozinho
   esconde (ex.: incidentes recorrentes, uma queda isolada de semanas atrás
   que ainda pesa na média).
+- **Planta baixa interativa**: envie a imagem do prédio/condomínio
+  (Configurações → Geral) e posicione cada dispositivo nela arrastando o
+  pino — o pino muda de cor sozinho com o status ao vivo (verde/amarelo/
+  vermelho), mostra um ícone de chave de fenda se estiver em manutenção, e
+  clicar nele abre o detalhe. Só admin arrasta/posiciona; qualquer usuário
+  logado pode ver.
+- **Manutenção programada**: marque um dispositivo em manutenção por 30min,
+  1h, 4h ou 24h — o monitoramento e o histórico continuam normais, só o
+  alerta (e o Telegram) fica em silêncio, pra não gerar ruído enquanto
+  alguém mexe fisicamente no equipamento.
+- **Saúde por local**: painel agrupando os dispositivos por localização
+  (bloco, portaria, garagem...) em vez de só por tipo — direto ao ponto
+  quando o problema é elétrico/de rede de um setor inteiro.
+- **QR code por dispositivo**: no detalhe, um QR code que abre direto aquele
+  dispositivo no celular (via link com `#device/ID`) — cola uma etiqueta
+  física perto do equipamento e o técnico de campo escaneia na hora.
+- **Notificações desktop**: som + notificação do navegador quando um
+  dispositivo fica offline, mesmo com a aba minimizada — toggle (sino) no
+  topo do painel.
+- **Modo TV/parede**: tela cheia alternando sozinho entre os painéis
+  principais a cada 15s — ícone de TV ao lado do sino, pensado pra um
+  monitor fixo numa sala de operação.
+- **Relatório executivo automático**: manda o mesmo PDF do botão "Relatório
+  executivo" sozinho pelo Telegram já configurado, semanal ou mensalmente
+  (Configurações → Telegram).
 - **Saúde do servidor**: CPU, memória, disco e uptime da própria máquina que
   roda o painel (aba "Servidor").
 - **Usuários**: crie/remova outros logins pela tela de Configurações → aba
@@ -245,6 +270,11 @@ depende só do ping.
   favorito.
 - `GET /api/devices/:id/uptime-heatmap?days=90` — % de uptime por dia de
   calendário, para o mapa de calor de disponibilidade.
+- `POST /api/devices/:id/maintenance` — coloca/tira um dispositivo de
+  manutenção (`until: ISOString | null`).
+- `POST /api/devices/:id/floor-position` — posição (x/y, 0 a 1) na planta
+  baixa; `x`/`y` null remove da planta.
+- `POST /api/settings/floorplan` — upload da imagem da planta baixa.
 - `POST /api/devices/:id/identify` / `POST /api/devices/identify-all` — MAC,
   fabricante e modelo (ONVIF/SSDP/HTTP).
 - `GET /api/alerts` — histórico de alertas ativos/resolvidos.
