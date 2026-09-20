@@ -62,6 +62,21 @@
     @supports (height: 100dvh) {
       .modal-card { max-height: 85dvh; }
     }
+
+    /* Grids de campos lado a lado no detalhe/formulário de dispositivo: uma
+       coluna "1fr" sozinha não deixa o item encolher abaixo do seu conteúdo
+       mínimo (ex.: os botões ao lado do campo de senha), o que empurrava o
+       campo para fora da tela em telas estreitas — minmax(0,1fr) corrige
+       isso, e a media query empilha tudo verticalmente no celular. */
+    .field-grid-2, .field-grid-3 {
+      display: grid;
+      gap: 10px;
+    }
+    .field-grid-2 { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+    .field-grid-3 { grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); }
+    @media (max-width: 480px) {
+      .field-grid-2, .field-grid-3 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>

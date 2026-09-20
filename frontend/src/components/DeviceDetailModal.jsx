@@ -141,7 +141,7 @@ export default function DeviceDetailModal({
               <Icon paths={ICONS.search} size={13} strokeWidth={2.2} /> {identifying ? 'Identificando...' : 'Identificar agora'}
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+          <div className="field-grid-3">
             <div>
               <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>MAC</label>
               <input value={form.mac} onChange={(e) => setForm({ ...form, mac: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }} />
@@ -176,10 +176,10 @@ export default function DeviceDetailModal({
               <Icon paths={ICONS.externalLink} size={13} strokeWidth={2.2} /> Abrir interface web
             </a>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
+          <div className="field-grid-2">
+            <div style={{ minWidth: 0 }}>
               <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Usuário</label>
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
                 <input
                   value={form.username}
                   onChange={(e) => setForm({ ...form, username: e.target.value })}
@@ -197,9 +197,9 @@ export default function DeviceDetailModal({
                 </button>
               </div>
             </div>
-            <div>
+            <div style={{ minWidth: 0 }}>
               <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Senha</label>
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
                 <input
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
