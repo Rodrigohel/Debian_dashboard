@@ -5,6 +5,7 @@ import {
   listDevices, getDevice, createDevice, updateDevice, deleteDevice, upsertDeviceByIp, getSummary, setFavorite, DEVICE_TYPES,
 } from '../services/devicesService.js';
 import { scanNetwork } from '../services/scanService.js';
+import { getDeviceUptimeHeatmap } from '../services/eventsService.js';
 import { runMonitorCycle } from '../services/monitorService.js';
 import { identifyDevice, identifyDevices } from '../services/identifyService.js';
 import { getSettings } from '../services/settingsService.js';
@@ -91,6 +92,13 @@ devicesRouter.put('/:id', requireAdmin, (req, res) => {
 devicesRouter.delete('/:id', requireAdmin, (req, res) => {
   deleteDevice(Number(req.params.id));
   res.status(204).end();
+});
+
+devicesRouter.get('/:id/uptime-heatmap', (req, res) => {
+  const device = getDevice(Number(req.params.id));
+  if (!device) return res.status(404).json({ error: 'Dispositivo não encontrado.' });
+  const days = Math.min(Number(req.query.days) || 90, 365);
+  res.json({ data: getDeviceUptimeHeatmap(device.id, days) });
 });
 
 devicesRouter.post('/:id/favorite', (req, res) => {

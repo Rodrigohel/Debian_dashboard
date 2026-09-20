@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Icon, { ICONS, TYPE_META } from './Icon.jsx';
 import { showToast } from '../utils/toast.js';
+import UptimeHeatmap from './UptimeHeatmap.jsx';
 
 const STATUS_META = {
   online: { label: 'Online', color: 'green' },
@@ -128,6 +129,8 @@ export default function DeviceDetailModal({
           <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Latência recente</div>
           <Sparkline colors={colors} checks={device.recentChecks} />
         </div>
+
+        <UptimeHeatmap colors={colors} deviceId={device.id} />
 
         <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>

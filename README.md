@@ -57,6 +57,12 @@ público opcional.
   "Relatório executivo" na aba "Análise de rede", com período de 7 ou 30
   dias. Diferente do "Exportar PDF" da lista de dispositivos, que é a ficha
   técnica completa de cada equipamento.
+- **Mapa de calor de disponibilidade**: no detalhe de cada dispositivo, um
+  calendário estilo "GitHub contributions" com os últimos 30 ou 90 dias —
+  cada quadradinho é um dia, colorido por % de uptime (verde a vermelho), com
+  tooltip mostrando a data exata. Mostra padrões que um número sozinho
+  esconde (ex.: incidentes recorrentes, uma queda isolada de semanas atrás
+  que ainda pesa na média).
 - **Saúde do servidor**: CPU, memória, disco e uptime da própria máquina que
   roda o painel (aba "Servidor").
 - **Usuários**: crie/remova outros logins pela tela de Configurações → aba
@@ -237,6 +243,8 @@ depende só do ping.
 - `POST /api/devices/:id/check` — força uma verificação de ping imediata.
 - `POST /api/devices/:id/favorite` — marca/desmarca um dispositivo como
   favorito.
+- `GET /api/devices/:id/uptime-heatmap?days=90` — % de uptime por dia de
+  calendário, para o mapa de calor de disponibilidade.
 - `POST /api/devices/:id/identify` / `POST /api/devices/identify-all` — MAC,
   fabricante e modelo (ONVIF/SSDP/HTTP).
 - `GET /api/alerts` — histórico de alertas ativos/resolvidos.

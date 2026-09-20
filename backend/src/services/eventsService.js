@@ -132,3 +132,60 @@ export function getDeviceUptime(deviceId, days = 7) {
   const uptimePercent = Math.max(0, Math.min(100, 100 * (1 - offlineMs / windowMs)));
   return { days, uptimePercent: Math.round(uptimePercent * 100) / 100, offlineMs };
 }
+
+// Distribui um intervalo [fromMs, toMs) num estado ('online'/'offline') pelos
+// dias de calendário (UTC) que ele atravessa — um dispositivo que caiu às
+// 23h e voltou às 2h do dia seguinte deve contar tempo offline nos dois dias.
+function distributeIntervalByDay(buckets, fromMs, toMs, state) {
+  let t = fromMs;
+  while (t < toMs) {
+    const dayStart = new Date(t);
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEndMs = dayStart.getTime() + 86400000;
+    const segEnd = Math.min(toMs, dayEndMs);
+    const key = dayStart.toISOString().slice(0, 10);
+    const bucket = buckets.get(key) || { offlineMs: 0, coveredMs: 0 };
+    bucket.coveredMs += segEnd - t;
+    if (state === 'offline') bucket.offlineMs += segEnd - t;
+    buckets.set(key, bucket);
+    t = segEnd;
+  }
+}
+
+/**
+ * Uptime por dia de calendário, últimos N dias — alimenta o "mapa de calor"
+ * de disponibilidade no detalhe do dispositivo (visual tipo GitHub
+ * contributions). Dias antes do dispositivo existir/ser monitorado voltam
+ * com uptimePercent null ("sem dados"), pra não fingir 100% sem ter certeza.
+ */
+export function getDeviceUptimeHeatmap(deviceId, days = 90) {
+  const now = Date.now();
+  const windowStart = now - days * 86400000;
+  const windowStartIso = new Date(windowStart).toISOString();
+
+  const before = lastEventBeforeStmt.get(deviceId, windowStartIso);
+  let state = before?.eventType === 'went_offline' ? 'offline' : 'online';
+  let cursor = windowStart;
+
+  const buckets = new Map();
+  for (const ev of eventsInWindowStmt.all(deviceId, windowStartIso)) {
+    const at = new Date(ev.at).getTime();
+    distributeIntervalByDay(buckets, cursor, at, state);
+    cursor = at;
+    state = ev.eventType === 'went_online' ? 'online' : 'offline';
+  }
+  distributeIntervalByDay(buckets, cursor, now, state);
+
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now - i * 86400000);
+    d.setUTCHours(0, 0, 0, 0);
+    const key = d.toISOString().slice(0, 10);
+    const bucket = buckets.get(key);
+    const uptimePercent = !bucket || bucket.coveredMs === 0
+      ? null
+      : Math.round(Math.max(0, Math.min(100, 100 * (1 - bucket.offlineMs / bucket.coveredMs))) * 10) / 10;
+    result.push({ date: key, uptimePercent });
+  }
+  return result;
+}
