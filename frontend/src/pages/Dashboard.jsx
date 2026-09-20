@@ -168,10 +168,10 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     }
   }
 
-  async function handleSetFloorPosition(id, x, y) {
-    setDevices((current) => current.map((d) => (d.id === id ? { ...d, floorX: x, floorY: y } : d)));
+  async function handleSetFloorPosition(id, floorId, x, y) {
+    setDevices((current) => current.map((d) => (d.id === id ? { ...d, floorId, floorX: x, floorY: y } : d)));
     try {
-      await api.setFloorPosition(id, x, y);
+      await api.setFloorPosition(id, floorId, x, y);
     } catch (err) {
       showToast(`Erro ao posicionar na planta: ${err.message}`, 'error');
       await loadAll();
@@ -408,7 +408,6 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
           <FloorPlanPanel
             colors={colors}
             devices={devices}
-            floorPlanUrl={settings.floorPlanUrl}
             isAdmin={user?.role === 'admin'}
             onSelectDevice={handleSelectDevice}
             onPositionChange={handleSetFloorPosition}

@@ -111,6 +111,17 @@ db.exec(`
     max_latency_ms REAL
   );
   CREATE INDEX IF NOT EXISTS idx_network_history_at ON network_history(at DESC);
+
+  -- Pavimentos de um prédio (subsolo, térreo, garagem, 1º andar...) — cada
+  -- um com sua própria imagem de planta baixa. Um dispositivo pertence a no
+  -- máximo um pavimento por vez (ver devices.floor_id).
+  CREATE TABLE IF NOT EXISTS floors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    image_url TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 // Migração leve: `CREATE TABLE IF NOT EXISTS` acima não adiciona colunas
@@ -129,8 +140,24 @@ for (const [column, ddl] of [
   ['maintenance_until', 'ALTER TABLE devices ADD COLUMN maintenance_until TEXT'],
   ['floor_x', 'ALTER TABLE devices ADD COLUMN floor_x REAL'],
   ['floor_y', 'ALTER TABLE devices ADD COLUMN floor_y REAL'],
+  ['floor_id', 'ALTER TABLE devices ADD COLUMN floor_id INTEGER REFERENCES floors(id)'],
 ]) {
   if (!deviceColumns.includes(column)) db.exec(ddl);
+}
+
+// Migração única: a primeira versão da planta baixa usava uma imagem só
+// (guardada em settings.floorPlanUrl) pra todos os dispositivos. Ao migrar
+// pra múltiplos pavimentos, se já existir aquela imagem antiga e nenhum
+// pavimento cadastrado ainda, cria um pavimento "Planta baixa" com ela e
+// migra os dispositivos já posicionados pra esse pavimento — não perde o
+// que a pessoa já tinha configurado.
+const floorsCount = db.prepare('SELECT COUNT(*) AS c FROM floors').get().c;
+if (floorsCount === 0) {
+  const oldFloorPlan = db.prepare("SELECT value FROM settings WHERE key = 'floorPlanUrl'").get();
+  if (oldFloorPlan?.value) {
+    const info = db.prepare('INSERT INTO floors (name, image_url, sort_order) VALUES (?, ?, 0)').run('Planta baixa', oldFloorPlan.value);
+    db.prepare('UPDATE devices SET floor_id = ? WHERE floor_x IS NOT NULL AND floor_y IS NOT NULL AND floor_id IS NULL').run(info.lastInsertRowid);
+  }
 }
 
 const networkHistoryColumns = db.prepare('PRAGMA table_info(network_history)').all().map((c) => c.name);

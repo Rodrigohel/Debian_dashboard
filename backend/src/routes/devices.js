@@ -119,19 +119,19 @@ devicesRouter.post('/:id/maintenance', requireAdmin, (req, res) => {
   res.json(setMaintenance(device.id, until));
 });
 
-// `x`/`y` null remove o dispositivo da planta baixa (volta pra lista de
-// "sem posição"); com número, deve estar entre 0 e 1 (posição relativa à
-// imagem, não pixels — assim a planta pode ser reenviada em outra
-// resolução sem precisar reposicionar tudo de novo).
+// `floorId`/`x`/`y` todos null remove o dispositivo de qualquer planta
+// baixa; com valores, `floorId` precisa ser um pavimento existente e `x`/`y`
+// entre 0 e 1 (posição relativa à imagem, não pixels — assim a planta pode
+// ser reenviada em outra resolução sem precisar reposicionar tudo de novo).
 devicesRouter.post('/:id/floor-position', requireAdmin, (req, res) => {
   const device = getDevice(Number(req.params.id));
   if (!device) return res.status(404).json({ error: 'Dispositivo não encontrado.' });
-  const { x, y } = req.body || {};
-  if (x === null && y === null) return res.json(setFloorPosition(device.id, null, null));
-  if (typeof x !== 'number' || typeof y !== 'number' || x < 0 || x > 1 || y < 0 || y > 1) {
-    return res.status(400).json({ error: 'Posição inválida (x/y devem estar entre 0 e 1).' });
+  const { floorId, x, y } = req.body || {};
+  if (floorId === null && x === null && y === null) return res.json(setFloorPosition(device.id, null, null, null));
+  if (typeof floorId !== 'number' || typeof x !== 'number' || typeof y !== 'number' || x < 0 || x > 1 || y < 0 || y > 1) {
+    return res.status(400).json({ error: 'Posição inválida (floorId numérico e x/y entre 0 e 1).' });
   }
-  res.json(setFloorPosition(device.id, x, y));
+  res.json(setFloorPosition(device.id, floorId, x, y));
 });
 
 // Verificação avulsa de um dispositivo específico, sem esperar a próxima

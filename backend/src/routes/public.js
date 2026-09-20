@@ -6,14 +6,12 @@ import { getSettings } from '../services/settingsService.js';
 
 export const publicRouter = Router();
 
-// Nome do condomínio/empresa, logo e planta baixa — usados no cabeçalho
-// antes mesmo do login (e a planta, por qualquer usuário logado, mesmo sem
-// ser admin — só quem edita a posição dos pinos precisa ser admin, ver
-// devicesRouter). Limites de alerta e credenciais do Telegram (também
-// guardados em `settings`) continuam exigindo login de admin.
+// Nome do condomínio/empresa e logo — usados no cabeçalho antes mesmo do
+// login. Só o subconjunto de marca é público; limites de alerta e
+// credenciais do Telegram (também guardados em `settings`) exigem login.
 publicRouter.get('/settings', (req, res) => {
-  const { companyName, siteName, logoUrl, floorPlanUrl } = getSettings();
-  res.json({ companyName, siteName, logoUrl, floorPlanUrl });
+  const { companyName, siteName, logoUrl } = getSettings();
+  res.json({ companyName, siteName, logoUrl });
 });
 
 /**

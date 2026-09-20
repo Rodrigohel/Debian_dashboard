@@ -96,7 +96,7 @@ export const api = {
   toggleFavorite: (id, favorite) => request(`/api/devices/${id}/favorite`, { method: 'POST', body: JSON.stringify({ favorite }) }),
   deviceUptimeHeatmap: (id, days = 90) => request(`/api/devices/${id}/uptime-heatmap?days=${days}`),
   setMaintenance: (id, until) => request(`/api/devices/${id}/maintenance`, { method: 'POST', body: JSON.stringify({ until }) }),
-  setFloorPosition: (id, x, y) => request(`/api/devices/${id}/floor-position`, { method: 'POST', body: JSON.stringify({ x, y }) }),
+  setFloorPosition: (id, floorId, x, y) => request(`/api/devices/${id}/floor-position`, { method: 'POST', body: JSON.stringify({ floorId, x, y }) }),
   identifyDevice: (id) => request(`/api/devices/${id}/identify`, { method: 'POST' }),
   identifyAll: (ids) => request('/api/devices/identify-all', { method: 'POST', body: JSON.stringify({ ids }) }),
   summary: () => request('/api/devices/summary'),
@@ -152,11 +152,13 @@ export const api = {
     }
     return res.json();
   },
-  uploadFloorPlan: async (file) => {
+  floors: () => request('/api/floors'),
+  createFloor: async (name, file) => {
     const token = getToken();
     const form = new FormData();
-    form.append('floorplan', file);
-    const res = await fetch(`${API_URL}/api/settings/floorplan`, {
+    form.append('name', name);
+    form.append('image', file);
+    const res = await fetch(`${API_URL}/api/floors`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
@@ -167,6 +169,24 @@ export const api = {
     }
     return res.json();
   },
+  renameFloor: (id, name) => request(`/api/floors/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
+  updateFloorImage: async (id, file) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('image', file);
+    const res = await fetch(`${API_URL}/api/floors/${id}/image`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Erro ${res.status}`);
+    }
+    return res.json();
+  },
+  deleteFloor: (id) => request(`/api/floors/${id}`, { method: 'DELETE' }),
+  reorderFloors: (ids) => request('/api/floors/reorder', { method: 'POST', body: JSON.stringify({ ids }) }),
 
   users: () => request('/api/users'),
   createUser: (data) => request('/api/users', { method: 'POST', body: JSON.stringify(data) }),

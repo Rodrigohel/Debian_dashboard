@@ -1,18 +1,63 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon, { ICONS, TYPE_META } from './Icon.jsx';
-import { resolveAssetUrl } from '../api/client.js';
+import { api, resolveAssetUrl } from '../api/client.js';
+import { showToast } from '../utils/toast.js';
 
 const STATUS_COLOR = { online: 'green', offline: 'red', degraded: 'amber', unknown: 'gray' };
+
+function floorStatus(devices, floorId) {
+  const onFloor = devices.filter((d) => d.floorId === floorId && d.enabled);
+  if (onFloor.length === 0) return 'gray';
+  if (onFloor.some((d) => d.status === 'offline')) return 'red';
+  if (onFloor.some((d) => d.status === 'degraded')) return 'amber';
+  return 'green';
+}
+
+// Botão de um pavimento no painel tipo "elevador": nome, contagem e um
+// pontinho que já mostra de longe se aquele andar tem algo errado — antes
+// mesmo de clicar pra ver a planta.
+function FloorButton({ colors, floor, count, statusColor, active, isAdmin, onSelect, onMoveUp, onMoveDown, isFirst, isLast }) {
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 10, cursor: 'pointer',
+        background: active ? `${colors.primary}16` : 'transparent',
+        border: `1px solid ${active ? colors.primary : 'transparent'}`,
+        position: 'relative',
+      }}
+      className="floor-btn"
+    >
+      <span style={{
+        width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: colors[statusColor],
+        animation: statusColor === 'red' ? 'pulseDot 1.4s ease-in-out infinite' : 'none',
+      }} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: active ? colors.primary : colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {floor.name}
+        </div>
+        <div style={{ fontSize: 10.5, color: colors.textTertiary }}>{count} disp.</div>
+      </div>
+      {isAdmin && (
+        <div className="floor-btn-arrows" style={{ display: 'flex', flexDirection: 'column', opacity: 0, transition: 'opacity .12s ease' }}>
+          <button disabled={isFirst} onClick={(e) => { e.stopPropagation(); onMoveUp(); }} style={{ border: 'none', background: 'transparent', color: colors.textTertiary, cursor: isFirst ? 'default' : 'pointer', opacity: isFirst ? 0.3 : 1, padding: 0, lineHeight: 0.7, display: 'flex', transform: 'rotate(180deg)' }}>
+            <Icon paths={ICONS.chevronDown} size={11} strokeWidth={2.4} />
+          </button>
+          <button disabled={isLast} onClick={(e) => { e.stopPropagation(); onMoveDown(); }} style={{ border: 'none', background: 'transparent', color: colors.textTertiary, cursor: isLast ? 'default' : 'pointer', opacity: isLast ? 0.3 : 1, padding: 0, lineHeight: 0.7 }}>
+            <Icon paths={ICONS.chevronDown} size={11} strokeWidth={2.4} />
+          </button>
+        </div>
+      )}
+      <style>{`.floor-btn:hover .floor-btn-arrows { opacity: 1; }`}</style>
+    </div>
+  );
+}
 
 function Pin({ colors, device, style, isAdmin, dragging, onPointerDown, onRemove, onClick }) {
   const color = colors[STATUS_COLOR[device.status]] || colors.gray;
   const inMaintenance = device.maintenanceUntil && new Date(device.maintenanceUntil) > new Date();
   return (
-    <div
-      style={{ position: 'absolute', transform: 'translate(-50%,-50%)', zIndex: dragging ? 30 : 10, ...style }}
-      onPointerDown={isAdmin ? onPointerDown : undefined}
-      className="floorplan-pin"
-    >
+    <div style={{ position: 'absolute', transform: 'translate(-50%,-50%)', zIndex: dragging ? 30 : 10, ...style }} onPointerDown={isAdmin ? onPointerDown : undefined} className="floorplan-pin">
       <div
         onClick={onClick}
         title={`${device.name} (${device.ip}) — ${device.status}`}
@@ -33,48 +78,88 @@ function Pin({ colors, device, style, isAdmin, dragging, onPointerDown, onRemove
       }}>
         {device.name}
         {isAdmin && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            style={{ marginLeft: 6, border: 'none', background: 'transparent', color: colors.textTertiary, cursor: 'pointer', pointerEvents: 'auto', fontWeight: 700 }}
-          >
-            ×
-          </button>
+          <button onClick={(e) => { e.stopPropagation(); onRemove(); }} style={{ marginLeft: 6, border: 'none', background: 'transparent', color: colors.textTertiary, cursor: 'pointer', pointerEvents: 'auto', fontWeight: 700 }}>×</button>
         )}
       </div>
     </div>
   );
 }
 
-// Planta baixa interativa: sobe uma imagem do prédio/condomínio (Config.) e
-// posiciona cada dispositivo nela arrastando o pino — muito mais intuitivo
-// que uma tabela pra localizar fisicamente ~230 pontos espalhados, e o pino
-// já muda de cor sozinho com o status ao vivo.
-export default function FloorPlanPanel({ colors, devices, floorPlanUrl, isAdmin, onSelectDevice, onPositionChange }) {
+function AddFloorForm({ colors, onCancel, onCreate }) {
+  const [name, setName] = useState('');
+  const [file, setFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!name.trim() || !file) return;
+    setSaving(true);
+    try {
+      await onCreate(name.trim(), file);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ border: `1px dashed ${colors.border}`, borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome (ex.: 2º Andar)" style={{ padding: '6px 8px', borderRadius: 7, border: `1px solid ${colors.border}`, fontSize: 12 }} />
+      <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} style={{ fontSize: 11 }} />
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button type="submit" disabled={saving || !name.trim() || !file} style={{ flex: 1, border: 'none', background: colors.primary, color: '#fff', borderRadius: 7, padding: '6px 8px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', opacity: (saving || !name.trim() || !file) ? 0.6 : 1 }}>
+          {saving ? 'Enviando...' : 'Adicionar'}
+        </button>
+        <button type="button" onClick={onCancel} style={{ border: `1px solid ${colors.border}`, background: 'transparent', color: colors.textSecondary, borderRadius: 7, padding: '6px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// Planta baixa interativa com suporte a múltiplos pavimentos (subsolo,
+// térreo, garagens, andares...) — cada um com sua própria imagem e seus
+// próprios pinos. O seletor à esquerda é tipo painel de elevador: já mostra
+// de longe qual andar tem problema, sem precisar entrar em cada um.
+export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevice, onPositionChange }) {
+  const [floors, setFloors] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
   const containerRef = useRef(null);
-  const [dragging, setDragging] = useState(null); // { id, x, y }
+  const [dragging, setDragging] = useState(null);
   const [addingId, setAddingId] = useState('');
 
-  const positioned = useMemo(() => devices.filter((d) => d.floorX != null && d.floorY != null), [devices]);
-  const unplaced = useMemo(() => devices.filter((d) => d.floorX == null || d.floorY == null), [devices]);
+  async function loadFloors(preferId) {
+    const res = await api.floors();
+    setFloors(res.data);
+    if (preferId !== undefined) setSelectedId(preferId);
+    else if (res.data.length > 0 && !res.data.some((f) => f.id === selectedId)) setSelectedId(res.data[0].id);
+  }
+
+  useEffect(() => { loadFloors(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedFloor = floors?.find((f) => f.id === selectedId) || null;
+  const positioned = useMemo(() => devices.filter((d) => d.floorId === selectedId && d.floorX != null && d.floorY != null), [devices, selectedId]);
+  const availableToAdd = useMemo(() => devices.filter((d) => d.floorId !== selectedId), [devices, selectedId]);
 
   function clientToRelative(clientX, clientY) {
     const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    const y = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
-    return { x, y };
+    return {
+      x: Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (clientY - rect.top) / rect.height)),
+    };
   }
 
   function handlePointerDown(device, e) {
     e.preventDefault();
     e.target.setPointerCapture?.(e.pointerId);
     setDragging({ id: device.id, ...clientToRelative(e.clientX, e.clientY) });
-
-    function handleMove(ev) {
-      setDragging((d) => (d ? { ...d, ...clientToRelative(ev.clientX, ev.clientY) } : d));
-    }
+    function handleMove(ev) { setDragging((d) => (d ? { ...d, ...clientToRelative(ev.clientX, ev.clientY) } : d)); }
     function handleUp(ev) {
       const pos = clientToRelative(ev.clientX, ev.clientY);
-      onPositionChange(device.id, pos.x, pos.y);
+      onPositionChange(device.id, selectedId, pos.x, pos.y);
       setDragging(null);
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
@@ -86,69 +171,202 @@ export default function FloorPlanPanel({ colors, devices, floorPlanUrl, isAdmin,
   function handleAddDevice(e) {
     const id = Number(e.target.value);
     if (!id) return;
-    onPositionChange(id, 0.5, 0.5);
+    onPositionChange(id, selectedId, 0.5, 0.5);
     setAddingId('');
   }
 
-  if (!floorPlanUrl) {
-    return (
-      <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '28px 22px', boxShadow: colors.shadow, textAlign: 'center' }}>
-        <Icon paths={ICONS.map} size={26} strokeWidth={1.6} color={colors.textTertiary} />
-        <div style={{ fontSize: 13.5, fontWeight: 700, color: colors.textPrimary, marginTop: 10 }}>Nenhuma planta baixa configurada</div>
-        <div style={{ fontSize: 12.5, color: colors.textSecondary, marginTop: 4 }}>
-          Envie a imagem do prédio/condomínio em Configurações → aba Geral pra posicionar cada dispositivo visualmente.
-        </div>
-      </div>
-    );
+  async function handleCreateFloor(name, file) {
+    try {
+      const floor = await api.createFloor(name, file);
+      await loadFloors(floor.id);
+      setShowAddForm(false);
+      showToast(`Pavimento "${name}" criado.`, 'success');
+    } catch (err) {
+      showToast(`Erro ao criar pavimento: ${err.message}`, 'error');
+    }
   }
+
+  async function handleRename() {
+    if (!renameValue.trim() || !selectedFloor) { setRenaming(false); return; }
+    try {
+      await api.renameFloor(selectedFloor.id, renameValue.trim());
+      await loadFloors(selectedFloor.id);
+    } catch (err) {
+      showToast(`Erro ao renomear: ${err.message}`, 'error');
+    } finally {
+      setRenaming(false);
+    }
+  }
+
+  async function handleReplaceImage(e) {
+    const file = e.target.files?.[0];
+    if (!file || !selectedFloor) return;
+    try {
+      await api.updateFloorImage(selectedFloor.id, file);
+      await loadFloors(selectedFloor.id);
+      showToast('Imagem do pavimento atualizada.', 'success');
+    } catch (err) {
+      showToast(`Erro ao trocar imagem: ${err.message}`, 'error');
+    }
+  }
+
+  async function handleDeleteFloor() {
+    if (!selectedFloor) return;
+    if (!confirm(`Excluir o pavimento "${selectedFloor.name}"? Os dispositivos nele deixam de aparecer em qualquer planta até serem reposicionados.`)) return;
+    try {
+      await api.deleteFloor(selectedFloor.id);
+      await loadFloors();
+    } catch (err) {
+      showToast(`Erro ao excluir pavimento: ${err.message}`, 'error');
+    }
+  }
+
+  async function handleMove(floor, dir) {
+    const ids = floors.map((f) => f.id);
+    const i = ids.indexOf(floor.id);
+    const j = i + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    try {
+      const res = await api.reorderFloors(ids);
+      setFloors(res.data);
+    } catch (err) {
+      showToast(`Erro ao reordenar: ${err.message}`, 'error');
+    }
+  }
+
+  if (floors === null) return null;
 
   return (
     <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px', boxShadow: colors.shadow }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Icon paths={ICONS.map} size={15} strokeWidth={2.2} color={colors.textSecondary} />
-          <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: colors.textPrimary }}>Planta baixa</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <Icon paths={ICONS.map} size={15} strokeWidth={2.2} color={colors.textSecondary} />
+        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: colors.textPrimary }}>Planta baixa</div>
+      </div>
+
+      {floors.length === 0 && !showAddForm && (
+        <div style={{ textAlign: 'center', padding: '24px 12px' }}>
+          <Icon paths={ICONS.map} size={24} strokeWidth={1.6} color={colors.textTertiary} />
+          <div style={{ fontSize: 13, fontWeight: 700, color: colors.textPrimary, marginTop: 8 }}>Nenhum pavimento cadastrado</div>
+          <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4, marginBottom: 12 }}>
+            {isAdmin ? 'Adicione o primeiro pavimento (ex.: Térreo) com a imagem da planta baixa.' : 'Peça a um administrador para configurar os pavimentos.'}
+          </div>
+          {isAdmin && (
+            <button onClick={() => setShowAddForm(true)} style={{ border: 'none', background: colors.primary, color: '#fff', borderRadius: 9, padding: '8px 16px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
+              + Adicionar pavimento
+            </button>
+          )}
         </div>
-        {isAdmin && unplaced.length > 0 && (
-          <select
-            value={addingId}
-            onChange={handleAddDevice}
-            style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, color: colors.textSecondary, borderRadius: 9, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-          >
-            <option value="">+ Posicionar dispositivo...</option>
-            {unplaced.map((d) => <option key={d.id} value={d.id}>{d.name} ({d.ip})</option>)}
-          </select>
-        )}
-      </div>
+      )}
 
-      <div
-        ref={containerRef}
-        style={{ position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', border: `1px solid ${colors.border}`, background: colors.bgCardAlt, touchAction: 'none' }}
-      >
-        <img src={resolveAssetUrl(floorPlanUrl)} alt="Planta baixa" style={{ display: 'block', width: '100%', height: 'auto', userSelect: 'none', pointerEvents: 'none' }} draggable={false} />
-        {positioned.map((d) => {
-          const isDragging = dragging?.id === d.id;
-          const x = isDragging ? dragging.x : d.floorX;
-          const y = isDragging ? dragging.y : d.floorY;
-          return (
-            <Pin
-              key={d.id}
-              colors={colors}
-              device={d}
-              isAdmin={isAdmin}
-              dragging={isDragging}
-              style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
-              onPointerDown={(e) => handlePointerDown(d, e)}
-              onRemove={() => onPositionChange(d.id, null, null)}
-              onClick={() => !isDragging && onSelectDevice(d)}
-            />
-          );
-        })}
-      </div>
+      {(floors.length > 0 || showAddForm) && (
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {/* Coluna estilo painel de elevador */}
+          <div style={{ width: 168, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 420, overflowY: 'auto' }}>
+            {floors.map((floor, i) => (
+              <FloorButton
+                key={floor.id}
+                colors={colors}
+                floor={floor}
+                count={devices.filter((d) => d.floorId === floor.id).length}
+                statusColor={floorStatus(devices, floor.id)}
+                active={floor.id === selectedId}
+                isAdmin={isAdmin}
+                onSelect={() => setSelectedId(floor.id)}
+                onMoveUp={() => handleMove(floor, -1)}
+                onMoveDown={() => handleMove(floor, 1)}
+                isFirst={i === 0}
+                isLast={i === floors.length - 1}
+              />
+            ))}
+            {isAdmin && !showAddForm && (
+              <button
+                onClick={() => setShowAddForm(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px dashed ${colors.border}`, background: 'transparent', color: colors.textSecondary, borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginTop: 4 }}
+              >
+                <Icon paths={ICONS.plus} size={12} strokeWidth={2.4} /> Pavimento
+              </button>
+            )}
+            {isAdmin && showAddForm && (
+              <div style={{ marginTop: 4 }}>
+                <AddFloorForm colors={colors} onCancel={() => setShowAddForm(false)} onCreate={handleCreateFloor} />
+              </div>
+            )}
+          </div>
 
-      {isAdmin && (
-        <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: 10 }}>
-          Arraste um pino pra reposicionar, clique no × pra remover da planta, ou use "Posicionar dispositivo" pra adicionar um novo.
+          {/* Planta do pavimento selecionado */}
+          {selectedFloor && (
+            <div style={{ flex: 1, minWidth: 280 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                {renaming ? (
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={handleRename}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setRenaming(false); }}
+                    style={{ fontSize: 14, fontWeight: 700, padding: '4px 8px', borderRadius: 7, border: `1px solid ${colors.primary}` }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 14, fontWeight: 700, color: colors.textPrimary }}>{selectedFloor.name}</div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {isAdmin && !renaming && (
+                    <>
+                      <button onClick={() => { setRenaming(true); setRenameValue(selectedFloor.name); }} title="Renomear" style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+                        <Icon paths={ICONS.pencil} size={12} strokeWidth={2.2} color={colors.textSecondary} />
+                      </button>
+                      <label title="Trocar imagem" style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+                        <Icon paths={ICONS.upload} size={12} strokeWidth={2.2} color={colors.textSecondary} />
+                        <input type="file" accept="image/*" onChange={handleReplaceImage} style={{ display: 'none' }} />
+                      </label>
+                      <button onClick={handleDeleteFloor} title="Excluir pavimento" style={{ border: `1px solid ${colors.redSoft}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+                        <Icon paths={ICONS.trash} size={12} strokeWidth={2.2} color={colors.red} />
+                      </button>
+                      {availableToAdd.length > 0 && (
+                        <select
+                          value={addingId}
+                          onChange={handleAddDevice}
+                          style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, color: colors.textSecondary, borderRadius: 8, padding: '6px 8px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          <option value="">+ Posicionar dispositivo...</option>
+                          {availableToAdd.map((d) => <option key={d.id} value={d.id}>{d.name} ({d.ip})</option>)}
+                        </select>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div ref={containerRef} style={{ position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', border: `1px solid ${colors.border}`, background: colors.bgCardAlt, touchAction: 'none' }}>
+                <img src={resolveAssetUrl(selectedFloor.imageUrl)} alt={selectedFloor.name} style={{ display: 'block', width: '100%', height: 'auto', userSelect: 'none', pointerEvents: 'none' }} draggable={false} />
+                {positioned.map((d) => {
+                  const isDragging = dragging?.id === d.id;
+                  const x = isDragging ? dragging.x : d.floorX;
+                  const y = isDragging ? dragging.y : d.floorY;
+                  return (
+                    <Pin
+                      key={d.id}
+                      colors={colors}
+                      device={d}
+                      isAdmin={isAdmin}
+                      dragging={isDragging}
+                      style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
+                      onPointerDown={(e) => handlePointerDown(d, e)}
+                      onRemove={() => onPositionChange(d.id, null, null, null)}
+                      onClick={() => !isDragging && onSelectDevice(d)}
+                    />
+                  );
+                })}
+              </div>
+
+              {isAdmin && (
+                <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: 8 }}>
+                  Arraste um pino pra reposicionar, clique no × pra remover do pavimento, ou use "Posicionar dispositivo" pra adicionar/mover um.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

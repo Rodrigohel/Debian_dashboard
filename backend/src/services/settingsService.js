@@ -11,7 +11,6 @@ const DEFAULTS = {
   companyName: process.env.DEFAULT_COMPANY_NAME || 'Minha Empresa',
   siteName: process.env.DEFAULT_SITE_NAME || 'Monitoramento de Rede',
   logoUrl: '',
-  floorPlanUrl: '',
   pingIntervalSeconds: String(config.monitor.pingIntervalSeconds),
   pingTimeoutMs: String(config.monitor.pingTimeoutMs),
   offlineThresholdFails: String(config.monitor.offlineThresholdFails),

@@ -16,7 +16,7 @@ const updateStmt = db.prepare(`
 `);
 const toggleFavoriteStmt = db.prepare('UPDATE devices SET favorite = @favorite WHERE id = @id');
 const setMaintenanceStmt = db.prepare('UPDATE devices SET maintenance_until = @maintenanceUntil WHERE id = @id');
-const setFloorPositionStmt = db.prepare('UPDATE devices SET floor_x = @floorX, floor_y = @floorY WHERE id = @id');
+const setFloorPositionStmt = db.prepare('UPDATE devices SET floor_id = @floorId, floor_x = @floorX, floor_y = @floorY WHERE id = @id');
 const deleteStmt = db.prepare('DELETE FROM devices WHERE id = ?');
 const getByIdStmt = db.prepare('SELECT * FROM devices WHERE id = ?');
 const getByIpStmt = db.prepare('SELECT * FROM devices WHERE ip = ?');
@@ -75,6 +75,7 @@ function rowToDevice(row) {
     username: row.device_username || '',
     favorite: !!row.favorite,
     maintenanceUntil: row.maintenance_until || null,
+    floorId: row.floor_id ?? null,
     floorX: row.floor_x ?? null,
     floorY: row.floor_y ?? null,
     status: row.status || 'unknown',
@@ -180,8 +181,11 @@ export function setMaintenance(id, until) {
   return getDevice(id);
 }
 
-export function setFloorPosition(id, floorX, floorY) {
-  setFloorPositionStmt.run({ id, floorX, floorY });
+// `floorId`/`floorX`/`floorY` todos null tira o dispositivo de qualquer
+// planta baixa (ver deleteFloor em floorsService, que faz o mesmo em massa
+// quando um pavimento inteiro é removido).
+export function setFloorPosition(id, floorId, floorX, floorY) {
+  setFloorPositionStmt.run({ id, floorId, floorX, floorY });
   return getDevice(id);
 }
 

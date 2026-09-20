@@ -13,6 +13,7 @@ import { settingsRouter } from './routes/settings.js';
 import { usersRouter } from './routes/users.js';
 import { statsRouter } from './routes/stats.js';
 import { historyRouter } from './routes/history.js';
+import { floorsRouter } from './routes/floors.js';
 import { requireAuth, requireAdmin } from './middleware/auth.js';
 import { startMonitorLoop } from './services/monitorService.js';
 import { startExecutiveReportScheduler } from './services/executiveReportScheduler.js';
@@ -39,6 +40,7 @@ app.use('/api/devices', requireAuth, devicesRouter);
 app.use('/api/alerts', requireAuth, alertsRouter);
 app.use('/api/stats', requireAuth, statsRouter);
 app.use('/api/history', requireAuth, historyRouter);
+app.use('/api/floors', requireAuth, floorsRouter);
 
 // Serve o próprio frontend buildado (frontend/dist, pasta irmã de backend/),
 // quando presente — assim um único processo Node atende tudo (API, WS e a

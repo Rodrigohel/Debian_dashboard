@@ -63,12 +63,20 @@ público opcional.
   tooltip mostrando a data exata. Mostra padrões que um número sozinho
   esconde (ex.: incidentes recorrentes, uma queda isolada de semanas atrás
   que ainda pesa na média).
-- **Planta baixa interativa**: envie a imagem do prédio/condomínio
-  (Configurações → Geral) e posicione cada dispositivo nela arrastando o
-  pino — o pino muda de cor sozinho com o status ao vivo (verde/amarelo/
-  vermelho), mostra um ícone de chave de fenda se estiver em manutenção, e
-  clicar nele abre o detalhe. Só admin arrasta/posiciona; qualquer usuário
-  logado pode ver.
+- **Planta baixa interativa, com vários pavimentos**: pensada pra prédio de
+  verdade — cadastre quantos pavimentos precisar (subsolo, térreo, garagem 1,
+  garagem 2, 1º andar, 2º andar...), cada um com sua própria imagem, e
+  posicione os dispositivos de cada andar arrastando o pino sobre a planta.
+  O seletor de pavimentos é estilo painel de elevador: cada andar mostra um
+  pontinho colorido ao vivo (verde/amarelo/vermelho, o pior status entre os
+  dispositivos daquele andar) e a contagem de dispositivos — dá pra ver de
+  longe qual andar tem problema antes de abrir. Reordene os andares com as
+  setinhas (ex.: de cima pra baixo, na ordem física do prédio), renomeie,
+  troque a imagem ou exclua um pavimento a qualquer momento — os dispositivos
+  continuam monitorados normalmente, só saem da planta. O pino também muda
+  de cor com o status ao vivo e mostra um ícone de chave de fenda se o
+  dispositivo estiver em manutenção; clicar nele abre o detalhe. Só admin
+  cria/edita pavimentos e arrasta pinos; qualquer usuário logado pode ver.
 - **Manutenção programada**: marque um dispositivo em manutenção por 30min,
   1h, 4h ou 24h — o monitoramento e o histórico continuam normais, só o
   alerta (e o Telegram) fica em silêncio, pra não gerar ruído enquanto
@@ -272,9 +280,15 @@ depende só do ping.
   calendário, para o mapa de calor de disponibilidade.
 - `POST /api/devices/:id/maintenance` — coloca/tira um dispositivo de
   manutenção (`until: ISOString | null`).
-- `POST /api/devices/:id/floor-position` — posição (x/y, 0 a 1) na planta
-  baixa; `x`/`y` null remove da planta.
-- `POST /api/settings/floorplan` — upload da imagem da planta baixa.
+- `POST /api/devices/:id/floor-position` — posição (`floorId` + x/y, 0 a 1)
+  de um dispositivo num pavimento; todos `null` remove de qualquer planta.
+- `GET /api/floors` — lista os pavimentos cadastrados (nome, imagem, ordem).
+- `POST /api/floors` — cria um pavimento (nome + imagem, admin).
+- `PUT /api/floors/:id` — renomeia um pavimento (admin).
+- `POST /api/floors/:id/image` — troca a imagem de um pavimento (admin).
+- `DELETE /api/floors/:id` — exclui um pavimento; os dispositivos nele saem
+  da planta mas continuam monitorados normalmente (admin).
+- `POST /api/floors/reorder` — grava a nova ordem dos pavimentos (admin).
 - `POST /api/devices/:id/identify` / `POST /api/devices/identify-all` — MAC,
   fabricante e modelo (ONVIF/SSDP/HTTP).
 - `GET /api/alerts` — histórico de alertas ativos/resolvidos.
