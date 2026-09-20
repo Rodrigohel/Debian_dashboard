@@ -81,7 +81,7 @@ ask "Nome da empresa/condomínio (aparece no painel)" "$COMPANY_NAME" COMPANY_NA
 ask "Porta do backend (serve API + WebSocket + o próprio painel web)" "$BACKEND_PORT" BACKEND_PORT
 
 # ---------------------------------------------------- 1. deps de sistema --
-log "1/7 — Instalando dependências do sistema (curl, iputils-ping, Node.js 20)"
+log "1/7 — Instalando dependências do sistema (curl, iputils-ping, Node.js)"
 export DEBIAN_FRONTEND=noninteractive
 # Não aborta se algum repositório de terceiros já configurado na máquina
 # estiver fora do ar/quebrado — só precisamos que os pacotes abaixo estejam
@@ -92,10 +92,27 @@ apt-get update -qq || warn "Falha ao atualizar algum repositório apt (pode ser 
 # para a arquitetura da máquina (comum em Raspberry Pi/ARM).
 apt-get install -y -qq curl ca-certificates iputils-ping gnupg rsync openssl build-essential python3 >/dev/null
 
-if ! command -v node >/dev/null 2>&1 || [ "$(node -v | sed 's/v//;s/\..*//')" -lt 20 ]; then
-  info "Instalando Node.js 20.x (NodeSource)..."
+# Reaproveita um Node.js >=18 já instalado, ao invés de forçar a versão 20 —
+# o backend só exige >=18 (ver package.json), e em servidores FreePBX/Sangoma
+# o pacote `nodejs` costuma pertencer ao `sangoma-pbxNN` (segurado via
+# `apt-mark hold`, junto de dezenas de pacotes `node-*`). Tentar substituí-lo
+# pela versão 20 da NodeSource entra em conflito com esse hold e o apt
+# recusa a instalação (pkgProblemResolver::Resolve) — e mesmo que aceitasse,
+# seria arriscado mexer num componente que o próprio FreePBX gerencia.
+# Só instala Node novo (via NodeSource) quando REALMENTE não existe nenhum
+# Node.js >=18 utilizável no sistema.
+NODE_OK=0
+if command -v node >/dev/null 2>&1; then
+  NODE_MAJOR="$(node -v | sed 's/v//;s/\..*//')"
+  [ "$NODE_MAJOR" -ge 18 ] 2>/dev/null && NODE_OK=1
+fi
+
+if [ "$NODE_OK" -eq 0 ]; then
+  info "Nenhum Node.js >=18 utilizável encontrado — instalando Node.js 20.x (NodeSource)..."
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
   apt-get install -y -qq nodejs >/dev/null
+else
+  info "Reaproveitando Node.js já instalado no sistema (não mexe no pacote 'nodejs' existente)."
 fi
 info "Node $(node -v) / npm $(npm -v)"
 
