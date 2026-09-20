@@ -53,19 +53,25 @@ function FloorButton({ colors, floor, count, statusColor, active, isAdmin, onSel
   );
 }
 
-function Pin({ colors, device, style, isAdmin, dragging, onPointerDown, onRemove, onClick }) {
+function Pin({ colors, device, style, editable, dragging, onPointerDown, onRemove, onClick }) {
   const color = colors[STATUS_COLOR[device.status]] || colors.gray;
   const inMaintenance = device.maintenanceUntil && new Date(device.maintenanceUntil) > new Date();
   return (
-    <div style={{ position: 'absolute', transform: 'translate(-50%,-50%)', zIndex: dragging ? 30 : 10, ...style }} onPointerDown={isAdmin ? onPointerDown : undefined} className="floorplan-pin">
+    <div
+      style={{ position: 'absolute', transform: 'translate(-50%,-50%)', zIndex: dragging ? 30 : 10, ...style }}
+      onPointerDown={editable ? onPointerDown : undefined}
+      onClick={editable ? undefined : onClick}
+      className="floorplan-pin"
+    >
       <div
-        onClick={onClick}
         title={`${device.name} (${device.ip}) — ${device.status}`}
         style={{
           width: 18, height: 18, borderRadius: 99, background: color, border: '2.5px solid #fff',
-          boxShadow: '0 1px 4px rgba(0,0,0,.35)', cursor: isAdmin ? 'grab' : 'pointer',
+          boxShadow: dragging ? '0 2px 10px rgba(0,0,0,.5)' : '0 1px 4px rgba(0,0,0,.35)',
+          cursor: editable ? 'grab' : 'pointer',
           animation: device.status === 'offline' ? 'pulseDot 1.4s ease-in-out infinite' : 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          outline: editable ? `2px dashed ${colors.primary}55` : 'none', outlineOffset: 2,
         }}
       >
         {inMaintenance && <Icon paths={ICONS.wrench} size={9} strokeWidth={3} color="#fff" />}
@@ -77,7 +83,7 @@ function Pin({ colors, device, style, isAdmin, dragging, onPointerDown, onRemove
         opacity: 0, transition: 'opacity .12s ease',
       }}>
         {device.name}
-        {isAdmin && (
+        {editable && (
           <button onClick={(e) => { e.stopPropagation(); onRemove(); }} style={{ marginLeft: 6, border: 'none', background: 'transparent', color: colors.textTertiary, cursor: 'pointer', pointerEvents: 'auto', fontWeight: 700 }}>×</button>
         )}
       </div>
@@ -130,6 +136,8 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
   const containerRef = useRef(null);
   const [dragging, setDragging] = useState(null);
   const [addingId, setAddingId] = useState('');
+  const [editMode, setEditMode] = useState(false);
+  const editable = isAdmin && editMode;
 
   async function loadFloors(preferId) {
     const res = await api.floors();
@@ -152,14 +160,34 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
     };
   }
 
+  // Distingue um clique parado (abre o detalhe, não mexe na posição) de um
+  // arraste de verdade (só conta como arraste depois de mover mais que
+  // DRAG_THRESHOLD px — sem isso, qualquer clique levemente impreciso em
+  // cima do pino já disparava um "reposicionamento" de 1px, fazendo o pino
+  // parecer que "sai do lugar sozinho" a cada clique).
+  const DRAG_THRESHOLD = 4;
+
   function handlePointerDown(device, e) {
     e.preventDefault();
     e.target.setPointerCapture?.(e.pointerId);
-    setDragging({ id: device.id, ...clientToRelative(e.clientX, e.clientY) });
-    function handleMove(ev) { setDragging((d) => (d ? { ...d, ...clientToRelative(ev.clientX, ev.clientY) } : d)); }
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let moved = false;
+
+    function handleMove(ev) {
+      if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) > DRAG_THRESHOLD) {
+        moved = true;
+        setDragging({ id: device.id, ...clientToRelative(startX, startY) });
+      }
+      if (moved) setDragging((d) => (d ? { ...d, ...clientToRelative(ev.clientX, ev.clientY) } : d));
+    }
     function handleUp(ev) {
-      const pos = clientToRelative(ev.clientX, ev.clientY);
-      onPositionChange(device.id, selectedId, pos.x, pos.y);
+      if (moved) {
+        const pos = clientToRelative(ev.clientX, ev.clientY);
+        onPositionChange(device.id, selectedId, pos.x, pos.y);
+      } else {
+        onSelectDevice(device);
+      }
       setDragging(null);
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
@@ -272,7 +300,7 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
                 statusColor={floorStatus(devices, floor.id)}
                 active={floor.id === selectedId}
                 isAdmin={isAdmin}
-                onSelect={() => setSelectedId(floor.id)}
+                onSelect={() => { setSelectedId(floor.id); setEditMode(false); }}
                 onMoveUp={() => handleMove(floor, -1)}
                 onMoveDown={() => handleMove(floor, 1)}
                 isFirst={i === 0}
@@ -323,7 +351,19 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
                       <button onClick={handleDeleteFloor} title="Excluir pavimento" style={{ border: `1px solid ${colors.redSoft}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
                         <Icon paths={ICONS.trash} size={12} strokeWidth={2.2} color={colors.red} />
                       </button>
-                      {availableToAdd.length > 0 && (
+                      <button
+                        onClick={() => setEditMode((v) => !v)}
+                        title={editMode ? 'Concluir edição' : 'Editar posições dos pinos'}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6, border: `1px solid ${editMode ? colors.primary : colors.border}`,
+                          background: editMode ? colors.primary : colors.bgCardAlt, color: editMode ? '#fff' : colors.textSecondary,
+                          borderRadius: 8, padding: '6px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        <Icon paths={editMode ? ICONS.check : ICONS.wrench} size={12} strokeWidth={2.4} />
+                        {editMode ? 'Concluir edição' : 'Editar posições'}
+                      </button>
+                      {editMode && availableToAdd.length > 0 && (
                         <select
                           value={addingId}
                           onChange={handleAddDevice}
@@ -338,7 +378,14 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
                 </div>
               </div>
 
-              <div ref={containerRef} style={{ position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', border: `1px solid ${colors.border}`, background: colors.bgCardAlt, touchAction: 'none' }}>
+              <div
+                ref={containerRef}
+                style={{
+                  position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', touchAction: 'none',
+                  border: `1px solid ${editable ? colors.primary : colors.border}`, background: colors.bgCardAlt,
+                  boxShadow: editable ? `0 0 0 3px ${colors.primary}22` : 'none',
+                }}
+              >
                 <img src={resolveAssetUrl(selectedFloor.imageUrl)} alt={selectedFloor.name} style={{ display: 'block', width: '100%', height: 'auto', userSelect: 'none', pointerEvents: 'none' }} draggable={false} />
                 {positioned.map((d) => {
                   const isDragging = dragging?.id === d.id;
@@ -349,12 +396,12 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
                       key={d.id}
                       colors={colors}
                       device={d}
-                      isAdmin={isAdmin}
+                      editable={editable}
                       dragging={isDragging}
                       style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
                       onPointerDown={(e) => handlePointerDown(d, e)}
                       onRemove={() => onPositionChange(d.id, null, null, null)}
-                      onClick={() => !isDragging && onSelectDevice(d)}
+                      onClick={() => onSelectDevice(d)}
                     />
                   );
                 })}
@@ -362,7 +409,9 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
 
               {isAdmin && (
                 <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: 8 }}>
-                  Arraste um pino pra reposicionar, clique no × pra remover do pavimento, ou use "Posicionar dispositivo" pra adicionar/mover um.
+                  {editMode
+                    ? 'Modo de edição: arraste um pino pra reposicionar, clique no × pra remover do pavimento, ou use "Posicionar dispositivo" pra adicionar/mover um.'
+                    : 'Clique num pino pra ver o dispositivo. Toque em "Editar posições" para poder arrastar.'}
                 </div>
               )}
             </div>
