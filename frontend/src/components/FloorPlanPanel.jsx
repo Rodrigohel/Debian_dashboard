@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Icon, { ICONS, TYPE_META } from './Icon.jsx';
 import { api, resolveAssetUrl } from '../api/client.js';
 import { showToast } from '../utils/toast.js';
@@ -137,6 +138,7 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
   const [dragging, setDragging] = useState(null);
   const [addingId, setAddingId] = useState('');
   const [editMode, setEditMode] = useState(false);
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const editable = isAdmin && editMode;
 
   async function loadFloors(preferId) {
@@ -147,6 +149,13 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
   }
 
   useEffect(() => { loadFloors(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!fullscreenOpen) return;
+    function handleKey(e) { if (e.key === 'Escape') setFullscreenOpen(false); }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [fullscreenOpen]);
 
   const selectedFloor = floors?.find((f) => f.id === selectedId) || null;
   const positioned = useMemo(() => devices.filter((d) => d.floorId === selectedId && d.floorX != null && d.floorY != null), [devices, selectedId]);
@@ -265,13 +274,156 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
 
   if (floors === null) return null;
 
-  return (
-    <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px', boxShadow: colors.shadow }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <Icon paths={ICONS.map} size={15} strokeWidth={2.2} color={colors.textSecondary} />
-        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: colors.textPrimary }}>Planta baixa</div>
+  const floorSidebar = (
+    <div style={{ width: 168, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 420, overflowY: 'auto' }}>
+      {floors.map((floor, i) => (
+        <FloorButton
+          key={floor.id}
+          colors={colors}
+          floor={floor}
+          count={devices.filter((d) => d.floorId === floor.id).length}
+          statusColor={floorStatus(devices, floor.id)}
+          active={floor.id === selectedId}
+          isAdmin={isAdmin}
+          onSelect={() => { setSelectedId(floor.id); setEditMode(false); }}
+          onMoveUp={() => handleMove(floor, -1)}
+          onMoveDown={() => handleMove(floor, 1)}
+          isFirst={i === 0}
+          isLast={i === floors.length - 1}
+        />
+      ))}
+      {isAdmin && !showAddForm && (
+        <button
+          onClick={() => setShowAddForm(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px dashed ${colors.border}`, background: 'transparent', color: colors.textSecondary, borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginTop: 4 }}
+        >
+          <Icon paths={ICONS.plus} size={12} strokeWidth={2.4} /> Pavimento
+        </button>
+      )}
+      {isAdmin && showAddForm && (
+        <div style={{ marginTop: 4 }}>
+          <AddFloorForm colors={colors} onCancel={() => setShowAddForm(false)} onCreate={handleCreateFloor} />
+        </div>
+      )}
+    </div>
+  );
+
+  // Conteúdo do pavimento selecionado (título, controles de admin, imagem
+  // com os pinos) — usado tanto inline (desktop) quanto dentro do overlay
+  // de tela cheia, sempre com o mesmo `containerRef`/pinos (nunca os dois
+  // ao mesmo tempo), pra não duplicar a lógica de arraste.
+  const stage = selectedFloor && (
+    <div style={{ flex: 1, minWidth: 280 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+        {renaming ? (
+          <input
+            autoFocus
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onBlur={handleRename}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setRenaming(false); }}
+            style={{ fontSize: 14, fontWeight: 700, padding: '4px 8px', borderRadius: 7, border: `1px solid ${colors.primary}` }}
+          />
+        ) : (
+          <div style={{ fontSize: 14, fontWeight: 700, color: colors.textPrimary }}>{selectedFloor.name}</div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {isAdmin && !renaming && (
+            <>
+              <button onClick={() => { setRenaming(true); setRenameValue(selectedFloor.name); }} title="Renomear" style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+                <Icon paths={ICONS.pencil} size={12} strokeWidth={2.2} color={colors.textSecondary} />
+              </button>
+              <label title="Trocar imagem" style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+                <Icon paths={ICONS.upload} size={12} strokeWidth={2.2} color={colors.textSecondary} />
+                <input type="file" accept="image/*" onChange={handleReplaceImage} style={{ display: 'none' }} />
+              </label>
+              <button onClick={handleDeleteFloor} title="Excluir pavimento" style={{ border: `1px solid ${colors.redSoft}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+                <Icon paths={ICONS.trash} size={12} strokeWidth={2.2} color={colors.red} />
+              </button>
+              <button
+                onClick={() => setEditMode((v) => !v)}
+                title={editMode ? 'Concluir edição' : 'Editar posições dos pinos'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, border: `1px solid ${editMode ? colors.primary : colors.border}`,
+                  background: editMode ? colors.primary : colors.bgCardAlt, color: editMode ? '#fff' : colors.textSecondary,
+                  borderRadius: 8, padding: '6px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                <Icon paths={editMode ? ICONS.check : ICONS.wrench} size={12} strokeWidth={2.4} />
+                {editMode ? 'Concluir edição' : 'Editar posições'}
+              </button>
+              {editMode && availableToAdd.length > 0 && (
+                <select
+                  value={addingId}
+                  onChange={handleAddDevice}
+                  style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, color: colors.textSecondary, borderRadius: 8, padding: '6px 8px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  <option value="">+ Posicionar dispositivo...</option>
+                  {availableToAdd.map((d) => <option key={d.id} value={d.id}>{d.name} ({d.ip})</option>)}
+                </select>
+              )}
+            </>
+          )}
+          {!fullscreenOpen ? (
+            <button onClick={() => setFullscreenOpen(true)} title="Ver em tela cheia" style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+              <Icon paths={ICONS.expand} size={12} strokeWidth={2.2} color={colors.textSecondary} />
+            </button>
+          ) : (
+            <button onClick={() => setFullscreenOpen(false)} title="Fechar" style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+              <Icon paths={ICONS.close} size={12} strokeWidth={2.2} color={colors.textSecondary} />
+            </button>
+          )}
+        </div>
       </div>
 
+      <div
+        ref={containerRef}
+        style={{
+          position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', touchAction: 'none',
+          border: `1px solid ${editable ? colors.primary : colors.border}`, background: colors.bgCardAlt,
+          boxShadow: editable ? `0 0 0 3px ${colors.primary}22` : 'none',
+        }}
+      >
+        <img src={resolveAssetUrl(selectedFloor.imageUrl)} alt={selectedFloor.name} style={{ display: 'block', width: '100%', height: 'auto', userSelect: 'none', pointerEvents: 'none' }} draggable={false} />
+        {positioned.map((d) => {
+          const isDragging = dragging?.id === d.id;
+          const x = isDragging ? dragging.x : d.floorX;
+          const y = isDragging ? dragging.y : d.floorY;
+          return (
+            <Pin
+              key={d.id}
+              colors={colors}
+              device={d}
+              editable={editable}
+              dragging={isDragging}
+              style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
+              onPointerDown={(e) => handlePointerDown(d, e)}
+              onRemove={() => onPositionChange(d.id, null, null, null)}
+              onClick={() => onSelectDevice(d)}
+            />
+          );
+        })}
+      </div>
+
+      {isAdmin && (
+        <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: 8 }}>
+          {editMode
+            ? 'Modo de edição: arraste um pino pra reposicionar, clique no × pra remover do pavimento, ou use "Posicionar dispositivo" pra adicionar/mover um.'
+            : 'Clique num pino pra ver o dispositivo. Toque em "Editar posições" para poder arrastar.'}
+        </div>
+      )}
+    </div>
+  );
+
+  const header = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+      <Icon paths={ICONS.map} size={15} strokeWidth={2.2} color={colors.textSecondary} />
+      <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: colors.textPrimary }}>Planta baixa</div>
+    </div>
+  );
+
+  const body = (
+    <>
       {floors.length === 0 && !showAddForm && (
         <div style={{ textAlign: 'center', padding: '24px 12px' }}>
           <Icon paths={ICONS.map} size={24} strokeWidth={1.6} color={colors.textTertiary} />
@@ -289,136 +441,61 @@ export default function FloorPlanPanel({ colors, devices, isAdmin, onSelectDevic
 
       {(floors.length > 0 || showAddForm) && (
         <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          {/* Coluna estilo painel de elevador */}
-          <div style={{ width: 168, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 420, overflowY: 'auto' }}>
-            {floors.map((floor, i) => (
-              <FloorButton
-                key={floor.id}
-                colors={colors}
-                floor={floor}
-                count={devices.filter((d) => d.floorId === floor.id).length}
-                statusColor={floorStatus(devices, floor.id)}
-                active={floor.id === selectedId}
-                isAdmin={isAdmin}
-                onSelect={() => { setSelectedId(floor.id); setEditMode(false); }}
-                onMoveUp={() => handleMove(floor, -1)}
-                onMoveDown={() => handleMove(floor, 1)}
-                isFirst={i === 0}
-                isLast={i === floors.length - 1}
-              />
-            ))}
-            {isAdmin && !showAddForm && (
-              <button
-                onClick={() => setShowAddForm(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px dashed ${colors.border}`, background: 'transparent', color: colors.textSecondary, borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginTop: 4 }}
-              >
-                <Icon paths={ICONS.plus} size={12} strokeWidth={2.4} /> Pavimento
-              </button>
-            )}
-            {isAdmin && showAddForm && (
-              <div style={{ marginTop: 4 }}>
-                <AddFloorForm colors={colors} onCancel={() => setShowAddForm(false)} onCreate={handleCreateFloor} />
-              </div>
-            )}
-          </div>
+          {floorSidebar}
 
-          {/* Planta do pavimento selecionado */}
-          {selectedFloor && (
-            <div style={{ flex: 1, minWidth: 280 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                {renaming ? (
-                  <input
-                    autoFocus
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onBlur={handleRename}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setRenaming(false); }}
-                    style={{ fontSize: 14, fontWeight: 700, padding: '4px 8px', borderRadius: 7, border: `1px solid ${colors.primary}` }}
-                  />
-                ) : (
-                  <div style={{ fontSize: 14, fontWeight: 700, color: colors.textPrimary }}>{selectedFloor.name}</div>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {isAdmin && !renaming && (
-                    <>
-                      <button onClick={() => { setRenaming(true); setRenameValue(selectedFloor.name); }} title="Renomear" style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
-                        <Icon paths={ICONS.pencil} size={12} strokeWidth={2.2} color={colors.textSecondary} />
-                      </button>
-                      <label title="Trocar imagem" style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
-                        <Icon paths={ICONS.upload} size={12} strokeWidth={2.2} color={colors.textSecondary} />
-                        <input type="file" accept="image/*" onChange={handleReplaceImage} style={{ display: 'none' }} />
-                      </label>
-                      <button onClick={handleDeleteFloor} title="Excluir pavimento" style={{ border: `1px solid ${colors.redSoft}`, background: colors.bgCardAlt, borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
-                        <Icon paths={ICONS.trash} size={12} strokeWidth={2.2} color={colors.red} />
-                      </button>
-                      <button
-                        onClick={() => setEditMode((v) => !v)}
-                        title={editMode ? 'Concluir edição' : 'Editar posições dos pinos'}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 6, border: `1px solid ${editMode ? colors.primary : colors.border}`,
-                          background: editMode ? colors.primary : colors.bgCardAlt, color: editMode ? '#fff' : colors.textSecondary,
-                          borderRadius: 8, padding: '6px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-                        }}
-                      >
-                        <Icon paths={editMode ? ICONS.check : ICONS.wrench} size={12} strokeWidth={2.4} />
-                        {editMode ? 'Concluir edição' : 'Editar posições'}
-                      </button>
-                      {editMode && availableToAdd.length > 0 && (
-                        <select
-                          value={addingId}
-                          onChange={handleAddDevice}
-                          style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, color: colors.textSecondary, borderRadius: 8, padding: '6px 8px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
-                        >
-                          <option value="">+ Posicionar dispositivo...</option>
-                          {availableToAdd.map((d) => <option key={d.id} value={d.id}>{d.name} ({d.ip})</option>)}
-                        </select>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div
-                ref={containerRef}
-                style={{
-                  position: 'relative', width: '100%', borderRadius: 10, overflow: 'hidden', touchAction: 'none',
-                  border: `1px solid ${editable ? colors.primary : colors.border}`, background: colors.bgCardAlt,
-                  boxShadow: editable ? `0 0 0 3px ${colors.primary}22` : 'none',
-                }}
-              >
-                <img src={resolveAssetUrl(selectedFloor.imageUrl)} alt={selectedFloor.name} style={{ display: 'block', width: '100%', height: 'auto', userSelect: 'none', pointerEvents: 'none' }} draggable={false} />
-                {positioned.map((d) => {
-                  const isDragging = dragging?.id === d.id;
-                  const x = isDragging ? dragging.x : d.floorX;
-                  const y = isDragging ? dragging.y : d.floorY;
-                  return (
-                    <Pin
-                      key={d.id}
-                      colors={colors}
-                      device={d}
-                      editable={editable}
-                      dragging={isDragging}
-                      style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
-                      onPointerDown={(e) => handlePointerDown(d, e)}
-                      onRemove={() => onPositionChange(d.id, null, null, null)}
-                      onClick={() => onSelectDevice(d)}
-                    />
-                  );
-                })}
-              </div>
-
-              {isAdmin && (
-                <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: 8 }}>
-                  {editMode
-                    ? 'Modo de edição: arraste um pino pra reposicionar, clique no × pra remover do pavimento, ou use "Posicionar dispositivo" pra adicionar/mover um.'
-                    : 'Clique num pino pra ver o dispositivo. Toque em "Editar posições" para poder arrastar.'}
+          {fullscreenOpen ? stage : (
+            <>
+              {/* Desktop: imagem inline. Some no celular (media query em
+                  index.html) — lá vira a linha compacta "Ver planta" abaixo. */}
+              <div className="floorplan-desktop-stage" style={{ display: 'contents' }}>{stage}</div>
+              {selectedFloor && (
+                <div
+                  className="floorplan-mobile-compact"
+                  onClick={() => setFullscreenOpen(true)}
+                  style={{
+                    alignItems: 'center', gap: 10, flex: 1, minWidth: 220, cursor: 'pointer',
+                    border: `1px solid ${colors.border}`, borderRadius: 10, padding: '10px 12px', background: colors.bgCardAlt,
+                  }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: colors[floorStatus(devices, selectedFloor.id)] }} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedFloor.name}</div>
+                    <div style={{ fontSize: 10.5, color: colors.textTertiary }}>{positioned.length} disp.</div>
+                  </div>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: colors.primary, whiteSpace: 'nowrap' }}>
+                    Ver planta <Icon paths={ICONS.chevronRight} size={12} strokeWidth={2.4} />
+                  </span>
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       )}
+    </>
+  );
 
+  if (fullscreenOpen) {
+    // Via portal, direto em document.body: se renderizasse no lugar normal,
+    // ficaria "preso" dentro do card da seção (que tem uma animação de
+    // entrada com transform — isso cria um novo containing block pra
+    // position:fixed, fazendo o "tela cheia" cobrir só o card em vez da
+    // tela toda).
+    return createPortal(
+      <div style={{ position: 'fixed', inset: 0, zIndex: 900, background: colors.pageGradient, padding: '16px 16px 32px', overflowY: 'auto' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px', boxShadow: colors.shadow }}>
+          {header}
+          {body}
+        </div>
+        <style>{`.floorplan-pin:hover .floorplan-pin-label { opacity: 1; }`}</style>
+      </div>,
+      document.body,
+    );
+  }
+
+  return (
+    <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '18px 20px', boxShadow: colors.shadow }}>
+      {header}
+      {body}
       <style>{`.floorplan-pin:hover .floorplan-pin-label { opacity: 1; }`}</style>
     </div>
   );

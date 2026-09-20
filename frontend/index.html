@@ -77,6 +77,17 @@
     @media (max-width: 480px) {
       .field-grid-2, .field-grid-3 { grid-template-columns: 1fr; }
     }
+
+    /* Planta baixa: a imagem inline some no celular (o card ficava enorme
+       numa tela estreita) e vira uma linha compacta "Ver planta", que abre
+       em tela cheia. No desktop é o oposto — a imagem some só quando a
+       tela cheia está aberta. */
+    .floorplan-desktop-stage { display: block; }
+    .floorplan-mobile-compact { display: none; }
+    @media (max-width: 640px) {
+      .floorplan-desktop-stage { display: none !important; }
+      .floorplan-mobile-compact { display: flex !important; }
+    }
   </style>
 </head>
 <body>
