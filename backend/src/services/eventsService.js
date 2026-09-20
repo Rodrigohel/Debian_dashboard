@@ -69,6 +69,30 @@ export function getFlappiestDevices(hours = 24, limit = 5) {
   return flappiestStmt.all({ since, limit });
 }
 
+const lastIncidentStmt = db.prepare(`
+  SELECT MAX(e.at) AS lastIncidentAt
+  FROM device_events e
+  JOIN devices d ON d.id = e.device_id
+  WHERE e.event_type = 'went_offline' AND d.enabled = 1
+`);
+
+/**
+ * Contador de "dias sem incidente" — tempo desde a última vez que QUALQUER
+ * dispositivo ativo ficou offline. Um clássico de painel de operação (tipo
+ * placa de "dias sem acidente" de fábrica): dá pra ver de longe se a rede
+ * está tranquila ou se algo caiu recentemente.
+ */
+export function getIncidentStreak() {
+  const row = lastIncidentStmt.get();
+  if (!row?.lastIncidentAt) return { days: null, hours: null, since: null };
+  const ms = Date.now() - new Date(row.lastIncidentAt).getTime();
+  return {
+    days: Math.floor(ms / 86400000),
+    hours: Math.floor(ms / 3600000),
+    since: row.lastIncidentAt,
+  };
+}
+
 const lastEventBeforeStmt = db.prepare(`
   SELECT event_type AS eventType FROM device_events
   WHERE device_id = ? AND at < ? AND event_type IN ('went_offline', 'went_online')

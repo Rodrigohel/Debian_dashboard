@@ -47,6 +47,16 @@ público opcional.
 - **Destaques**: dois rankings automáticos logo abaixo dos gráficos —
   **"Mais instáveis (24h)"** (quem mais caiu) e **"Maior latência agora"** —
   pra ir direto no equipamento problemático em vez de vasculhar ~230 IPs.
+- **"X dias sem incidente crítico"**: contador animado no topo do painel
+  (estilo placa de operação), com o tempo desde a última vez que algum
+  dispositivo ficou offline — fica amarelo se um incidente aconteceu nas
+  últimas 24h.
+- **Relatório executivo em PDF**: um resumo de uma página (uptime médio,
+  incidentes no período, tempo total offline, latência, situação por tipo e
+  top 5 mais instáveis) pra imprimir ou anexar num e-mail de status — botão
+  "Relatório executivo" na aba "Análise de rede", com período de 7 ou 30
+  dias. Diferente do "Exportar PDF" da lista de dispositivos, que é a ficha
+  técnica completa de cada equipamento.
 - **Saúde do servidor**: CPU, memória, disco e uptime da própria máquina que
   roda o painel (aba "Servidor").
 - **Usuários**: crie/remova outros logins pela tela de Configurações → aba
@@ -237,6 +247,10 @@ depende só do ping.
 - `GET /api/stats/server-health` — CPU, memória, disco e uptime do servidor.
 - `GET /api/stats/flappiest?hours=24&limit=5` — ranking dos dispositivos que
   mais caíram no período.
+- `GET /api/stats/incident-streak` — tempo desde o último dispositivo que
+  ficou offline (contador "dias sem incidente").
+- `GET /api/stats/report/executive?days=7` — relatório executivo em PDF do
+  período (uptime, incidentes, latência, top instáveis).
 - `GET/POST/DELETE /api/users` — gestão de usuários do painel (admin).
 - `GET/PUT /api/settings`, `POST /api/settings/telegram/test` — configuração.
 - WebSocket em `/ws` — push do status de todos os dispositivos a cada rodada

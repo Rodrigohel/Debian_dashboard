@@ -125,6 +125,8 @@ export const api = {
   networkHistory: (hours) => request(`/api/stats/network-history?hours=${hours}`),
   serverHealth: () => request('/api/stats/server-health'),
   flappiestDevices: (hours = 24, limit = 5) => request(`/api/stats/flappiest?hours=${hours}&limit=${limit}`),
+  incidentStreak: () => request('/api/stats/incident-streak'),
+  executiveReportPdf: (days = 7) => downloadFile(`/api/stats/report/executive?days=${days}`, `relatorio-executivo-${days}d.pdf`),
 
   publicDashboard: () => request('/api/public/dashboard'),
   publicSettings: () => request('/api/public/settings'),

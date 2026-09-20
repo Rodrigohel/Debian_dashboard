@@ -15,6 +15,8 @@ import LoadingScreen from '../components/LoadingScreen.jsx';
 import NetworkHistoryChart from '../components/NetworkHistoryChart.jsx';
 import LatencyChart from '../components/LatencyChart.jsx';
 import TopIssues from '../components/TopIssues.jsx';
+import IncidentStreakBanner from '../components/IncidentStreakBanner.jsx';
+import ExecutiveReportButton from '../components/ExecutiveReportButton.jsx';
 import ServerHealthPanel from '../components/ServerHealthPanel.jsx';
 import HistoryPanel from '../components/HistoryPanel.jsx';
 import ToastContainer from '../components/ToastContainer.jsx';
@@ -318,6 +320,8 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
 
         <HeroBanner colors={colors} banner={heroBanner} />
 
+        <IncidentStreakBanner colors={colors} />
+
         <IndicatorCards colors={colors} cards={indicatorCards} />
 
         <div ref={devicesSectionRef} style={{ ...reveal(1), scrollMarginTop: 20 }}>
@@ -339,6 +343,9 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
         </div>
 
         <div ref={chartSectionRef} style={{ ...reveal(2), scrollMarginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <ExecutiveReportButton colors={colors} />
+          </div>
           <NetworkHistoryChart colors={colors} />
           <LatencyChart colors={colors} />
           <TopIssues colors={colors} devices={devices} icons={ICONS} />
