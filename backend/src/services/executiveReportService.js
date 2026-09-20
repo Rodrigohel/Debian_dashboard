@@ -53,25 +53,17 @@ function formatDuration(ms) {
   return `${(hours / 24).toFixed(1)} dias`;
 }
 
-/**
- * Relatório executivo em PDF: um resumo de uma página pro período (uptime
- * médio, incidentes, latência, situação por tipo, top instáveis) — pensado
- * pra imprimir/anexar num e-mail de status pra síndico/gestor, sem precisar
- * abrir o painel. Complementa o relatório de dispositivos (lista completa
- * com MAC/fabricante/modelo) com uma visão de "como a rede se comportou".
- */
-export function streamExecutiveReportPdf(res, { days = 7 } = {}) {
+// Desenha o relatório num PDFDocument já criado — compartilhado entre a
+// rota HTTP (`streamExecutiveReportPdf`, que faz `doc.pipe(res)`) e o envio
+// automático por Telegram (`generateExecutiveReportBuffer`, que coleta os
+// bytes em memória), pra não duplicar o layout entre os dois usos.
+function drawExecutiveReport(doc, days) {
   const settings = getSettings();
   const summary = getSummary();
   const { avgUptime, offlineMsSum } = networkUptimeAndDowntime(days);
   const incidentCount = periodIncidentCount(days);
   const latency = latencyStats(days);
   const flappiest = getFlappiestDevices(days * 24, 5);
-
-  const doc = new PDFDocument({ margin: 42, size: 'A4' });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="relatorio-executivo-${days}d.pdf"`);
-  doc.pipe(res);
 
   const startX = doc.page.margins.left;
   const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
@@ -133,6 +125,35 @@ export function streamExecutiveReportPdf(res, { days = 7 } = {}) {
     'Relatório gerado automaticamente pelo painel de monitoramento de rede.',
     startX, doc.page.height - doc.page.margins.bottom - 14,
   );
+}
 
+/**
+ * Relatório executivo em PDF: um resumo de uma página pro período (uptime
+ * médio, incidentes, latência, situação por tipo, top instáveis) — pensado
+ * pra imprimir/anexar num e-mail de status pra síndico/gestor, sem precisar
+ * abrir o painel. Complementa o relatório de dispositivos (lista completa
+ * com MAC/fabricante/modelo) com uma visão de "como a rede se comportou".
+ */
+export function streamExecutiveReportPdf(res, { days = 7 } = {}) {
+  const doc = new PDFDocument({ margin: 42, size: 'A4' });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="relatorio-executivo-${days}d.pdf"`);
+  doc.pipe(res);
+  drawExecutiveReport(doc, days);
   doc.end();
+}
+
+// Mesmo relatório, mas coletado em memória como Buffer — usado pelo envio
+// automático por Telegram (ver executiveReportScheduler.js), que precisa do
+// arquivo pronto antes de anexar na chamada sendDocument.
+export function generateExecutiveReportBuffer(days = 7) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 42, size: 'A4' });
+    const chunks = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    drawExecutiveReport(doc, days);
+    doc.end();
+  });
 }

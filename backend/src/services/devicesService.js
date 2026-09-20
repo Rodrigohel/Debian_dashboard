@@ -15,6 +15,8 @@ const updateStmt = db.prepare(`
   WHERE id=@id
 `);
 const toggleFavoriteStmt = db.prepare('UPDATE devices SET favorite = @favorite WHERE id = @id');
+const setMaintenanceStmt = db.prepare('UPDATE devices SET maintenance_until = @maintenanceUntil WHERE id = @id');
+const setFloorPositionStmt = db.prepare('UPDATE devices SET floor_x = @floorX, floor_y = @floorY WHERE id = @id');
 const deleteStmt = db.prepare('DELETE FROM devices WHERE id = ?');
 const getByIdStmt = db.prepare('SELECT * FROM devices WHERE id = ?');
 const getByIpStmt = db.prepare('SELECT * FROM devices WHERE ip = ?');
@@ -72,6 +74,9 @@ function rowToDevice(row) {
     // não trafegar todas as senhas criptografadas a cada rodada de polling.
     username: row.device_username || '',
     favorite: !!row.favorite,
+    maintenanceUntil: row.maintenance_until || null,
+    floorX: row.floor_x ?? null,
+    floorY: row.floor_y ?? null,
     status: row.status || 'unknown',
     latencyMs: row.latencyMs ?? null,
     lastCheckAt: row.lastCheckAt || null,
@@ -163,6 +168,20 @@ export function deleteDevice(id) {
 
 export function setFavorite(id, favorite) {
   toggleFavoriteStmt.run({ id, favorite: favorite ? 1 : 0 });
+  return getDevice(id);
+}
+
+// `until: null` encerra a manutenção na hora — enquanto no futuro, o monitor
+// continua checando e registrando histórico normalmente, só suprime o
+// alerta/Telegram (ver monitorService), pra não gerar ruído quando alguém
+// está mexendo fisicamente no equipamento.
+export function setMaintenance(id, until) {
+  setMaintenanceStmt.run({ id, maintenanceUntil: until });
+  return getDevice(id);
+}
+
+export function setFloorPosition(id, floorX, floorY) {
+  setFloorPositionStmt.run({ id, floorX, floorY });
   return getDevice(id);
 }
 

@@ -15,6 +15,7 @@ import { statsRouter } from './routes/stats.js';
 import { historyRouter } from './routes/history.js';
 import { requireAuth, requireAdmin } from './middleware/auth.js';
 import { startMonitorLoop } from './services/monitorService.js';
+import { startExecutiveReportScheduler } from './services/executiveReportScheduler.js';
 import { listDevices } from './services/devicesService.js';
 import './db/sqlite.js';
 
@@ -77,6 +78,7 @@ startMonitorLoop((results) => {
   if (wss.clients.size === 0) return;
   broadcast('devices:update', results);
 });
+startExecutiveReportScheduler();
 
 server.listen(config.port, '0.0.0.0', () => {
   const total = listDevices().length;

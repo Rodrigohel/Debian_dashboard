@@ -2,7 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireAdmin } from '../middleware/auth.js';
 import {
-  listDevices, getDevice, createDevice, updateDevice, deleteDevice, upsertDeviceByIp, getSummary, setFavorite, DEVICE_TYPES,
+  listDevices, getDevice, createDevice, updateDevice, deleteDevice, upsertDeviceByIp, getSummary, setFavorite,
+  setMaintenance, setFloorPosition, DEVICE_TYPES,
 } from '../services/devicesService.js';
 import { scanNetwork } from '../services/scanService.js';
 import { getDeviceUptimeHeatmap } from '../services/eventsService.js';
@@ -105,6 +106,27 @@ devicesRouter.post('/:id/favorite', (req, res) => {
   const device = getDevice(Number(req.params.id));
   if (!device) return res.status(404).json({ error: 'Dispositivo não encontrado.' });
   res.json(setFavorite(device.id, req.body?.favorite !== false));
+});
+
+// `until: null` (ou ausente) encerra a manutenção imediatamente.
+devicesRouter.post('/:id/maintenance', requireAdmin, (req, res) => {
+  const device = getDevice(Number(req.params.id));
+  if (!device) return res.status(404).json({ error: 'Dispositivo não encontrado.' });
+  const until = req.body?.until || null;
+  if (until && Number.isNaN(new Date(until).getTime())) {
+    return res.status(400).json({ error: 'Data inválida.' });
+  }
+  res.json(setMaintenance(device.id, until));
+});
+
+devicesRouter.post('/:id/floor-position', requireAdmin, (req, res) => {
+  const device = getDevice(Number(req.params.id));
+  if (!device) return res.status(404).json({ error: 'Dispositivo não encontrado.' });
+  const { x, y } = req.body || {};
+  if (typeof x !== 'number' || typeof y !== 'number' || x < 0 || x > 1 || y < 0 || y > 1) {
+    return res.status(400).json({ error: 'Posição inválida (x/y devem estar entre 0 e 1).' });
+  }
+  res.json(setFloorPosition(device.id, x, y));
 });
 
 // Verificação avulsa de um dispositivo específico, sem esperar a próxima

@@ -49,8 +49,9 @@ function timeAgo(iso) {
   return `${hours}h atrás`;
 }
 
-function StatusDot({ colors, status }) {
+function StatusDot({ colors, status, maintenanceUntil }) {
   const meta = STATUS_META[status] || STATUS_META.unknown;
+  const inMaintenance = maintenanceUntil && new Date(maintenanceUntil) > new Date();
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: colors[meta.color],
@@ -60,6 +61,11 @@ function StatusDot({ colors, status }) {
         animation: status === 'offline' ? 'pulseDot 1.4s ease-in-out infinite' : 'none',
       }} />
       {meta.label}
+      {inMaintenance && (
+        <span title="Em manutenção" style={{ display: 'inline-flex' }}>
+          <Icon paths={ICONS.wrench} size={11} strokeWidth={2.4} color={colors.amber} />
+        </span>
+      )}
     </span>
   );
 }
@@ -261,7 +267,7 @@ export default function DevicesPanel({
                       <Icon paths={ICONS.starFilled} size={15} strokeWidth={1.8} color={d.favorite ? colors.amber : colors.border} />
                     </button>
                   </td>
-                  <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}><StatusDot colors={colors} status={d.status} /></td>
+                  <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}><StatusDot colors={colors} status={d.status} maintenanceUntil={d.maintenanceUntil} /></td>
                   <td style={{ padding: '10px 14px', fontWeight: 600, color: colors.textPrimary, whiteSpace: 'nowrap' }}>{d.name}</td>
                   <td style={{ padding: '10px 14px', color: colors.textSecondary, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{d.ip}</td>
                   <td style={{ padding: '10px 14px', color: colors.textTertiary, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{d.mac || '—'}</td>

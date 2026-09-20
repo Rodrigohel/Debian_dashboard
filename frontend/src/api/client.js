@@ -95,6 +95,8 @@ export const api = {
   checkDeviceNow: (id) => request(`/api/devices/${id}/check`, { method: 'POST' }),
   toggleFavorite: (id, favorite) => request(`/api/devices/${id}/favorite`, { method: 'POST', body: JSON.stringify({ favorite }) }),
   deviceUptimeHeatmap: (id, days = 90) => request(`/api/devices/${id}/uptime-heatmap?days=${days}`),
+  setMaintenance: (id, until) => request(`/api/devices/${id}/maintenance`, { method: 'POST', body: JSON.stringify({ until }) }),
+  setFloorPosition: (id, x, y) => request(`/api/devices/${id}/floor-position`, { method: 'POST', body: JSON.stringify({ x, y }) }),
   identifyDevice: (id) => request(`/api/devices/${id}/identify`, { method: 'POST' }),
   identifyAll: (ids) => request('/api/devices/identify-all', { method: 'POST', body: JSON.stringify({ ids }) }),
   summary: () => request('/api/devices/summary'),

@@ -37,7 +37,7 @@ settingsRouter.get('/', (req, res) => {
 settingsRouter.put('/', (req, res) => {
   const {
     companyName, siteName, pingIntervalSeconds, pingTimeoutMs, offlineThresholdFails, alertReminderIntervalMinutes,
-    networkBase, networkHistoryRetentionHours, telegramBotToken, telegramChatId,
+    networkBase, networkHistoryRetentionHours, telegramBotToken, telegramChatId, executiveReportFrequency,
   } = req.body || {};
   const updates = {};
 
@@ -84,6 +84,13 @@ settingsRouter.put('/', (req, res) => {
 
   if (typeof telegramBotToken === 'string') updates.telegramBotToken = telegramBotToken.trim();
   if (typeof telegramChatId === 'string') updates.telegramChatId = telegramChatId.trim();
+
+  if (executiveReportFrequency !== undefined) {
+    if (!['off', 'weekly', 'monthly'].includes(executiveReportFrequency)) {
+      return res.status(400).json({ error: 'Frequência do relatório executivo inválida.' });
+    }
+    updates.executiveReportFrequency = executiveReportFrequency;
+  }
 
   res.json(setSettings(updates));
 });

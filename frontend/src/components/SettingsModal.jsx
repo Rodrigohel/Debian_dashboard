@@ -97,6 +97,15 @@ function TelegramTab({ colors, form, setForm, onTest, testing }) {
       >
         {testing ? 'Enviando...' : 'Testar notificação'}
       </button>
+
+      <SectionLabel colors={colors}>Relatório executivo automático</SectionLabel>
+      <Field colors={colors} label="Frequência de envio pelo Telegram" hint="Manda o mesmo PDF do botão 'Relatório executivo' sozinho, no bot/chat configurado acima — precisa dos dois campos preenchidos.">
+        <select value={form.executiveReportFrequency} onChange={(e) => setForm({ ...form, executiveReportFrequency: e.target.value })} style={inputStyle(colors)}>
+          <option value="off">Desativado</option>
+          <option value="weekly">Semanal (últimos 7 dias)</option>
+          <option value="monthly">Mensal (últimos 30 dias)</option>
+        </select>
+      </Field>
     </>
   );
 }
@@ -202,6 +211,7 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
     networkHistoryRetentionHours: settings.networkHistoryRetentionHours || '168',
     telegramBotToken: settings.telegramBotToken || '',
     telegramChatId: settings.telegramChatId || '',
+    executiveReportFrequency: settings.executiveReportFrequency || 'off',
     logoFile: null,
   });
   const [saving, setSaving] = useState(false);

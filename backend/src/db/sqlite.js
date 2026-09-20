@@ -37,6 +37,9 @@ db.exec(`
     device_username TEXT NOT NULL DEFAULT '',     -- login de acesso ao próprio equipamento
     device_password_enc TEXT NOT NULL DEFAULT '', -- senha de acesso, criptografada (ver cryptoService)
     favorite INTEGER NOT NULL DEFAULT 0,
+    maintenance_until TEXT,                        -- ISO datetime: enquanto no futuro, suprime alertas/Telegram
+    floor_x REAL,                                  -- posição na planta baixa (0-1, relativo à imagem)
+    floor_y REAL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -123,6 +126,9 @@ for (const [column, ddl] of [
   ['device_username', "ALTER TABLE devices ADD COLUMN device_username TEXT NOT NULL DEFAULT ''"],
   ['device_password_enc', "ALTER TABLE devices ADD COLUMN device_password_enc TEXT NOT NULL DEFAULT ''"],
   ['favorite', 'ALTER TABLE devices ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0'],
+  ['maintenance_until', 'ALTER TABLE devices ADD COLUMN maintenance_until TEXT'],
+  ['floor_x', 'ALTER TABLE devices ADD COLUMN floor_x REAL'],
+  ['floor_y', 'ALTER TABLE devices ADD COLUMN floor_y REAL'],
 ]) {
   if (!deviceColumns.includes(column)) db.exec(ddl);
 }

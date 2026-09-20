@@ -17,11 +17,14 @@ import LatencyChart from '../components/LatencyChart.jsx';
 import TopIssues from '../components/TopIssues.jsx';
 import IncidentStreakBanner from '../components/IncidentStreakBanner.jsx';
 import ExecutiveReportButton from '../components/ExecutiveReportButton.jsx';
+import LocationHealthPanel from '../components/LocationHealthPanel.jsx';
+import TvMode from '../components/TvMode.jsx';
 import ServerHealthPanel from '../components/ServerHealthPanel.jsx';
 import HistoryPanel from '../components/HistoryPanel.jsx';
 import ToastContainer from '../components/ToastContainer.jsx';
 import CommandPalette from '../components/CommandPalette.jsx';
 import { showToast } from '../utils/toast.js';
+import { fireDesktopAlert } from '../utils/desktopAlerts.js';
 
 const THEME_KEY = 'ip_dashboard_theme';
 const POLL_MS = 15000;
@@ -46,6 +49,7 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
   const [showAddModal, setShowAddModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [monitoring, setMonitoring] = useState(false);
+  const [tvMode, setTvMode] = useState(false);
 
   const [devices, setDevices] = useState(null);
   const [alerts, setAlerts] = useState([]);
@@ -93,7 +97,13 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
           const byId = new Map(current.map((d) => [d.id, d]));
           for (const updated of msg.payload) {
             const existing = byId.get(updated.id);
-            if (existing) byId.set(updated.id, { ...existing, status: updated.status, latencyMs: updated.latencyMs, lastCheckAt: updated.lastCheckAt });
+            if (existing) {
+              const noMaintenance = !existing.maintenanceUntil || new Date(existing.maintenanceUntil) <= new Date();
+              if (existing.status !== 'offline' && updated.status === 'offline' && noMaintenance) {
+                fireDesktopAlert('Dispositivo offline', `${existing.name} (${existing.ip}) parou de responder.`);
+              }
+              byId.set(updated.id, { ...existing, status: updated.status, latencyMs: updated.latencyMs, lastCheckAt: updated.lastCheckAt });
+            }
           }
           return Array.from(byId.values());
         });
@@ -112,7 +122,25 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
   async function handleSelectDevice(device) {
     const full = await api.deviceDetail(device.id);
     setSelectedDevice(full);
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#device/${device.id}`);
   }
+
+  function handleCloseDeviceModal() {
+    setSelectedDevice(null);
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+  }
+
+  // Deep link (#device/123): abre o detalhe direto ao carregar — usado pelo
+  // QR code por dispositivo, pra escanear e cair exatamente naquela tela.
+  useEffect(() => {
+    if (!devices) return;
+    const match = window.location.hash.match(/^#device\/(\d+)$/);
+    if (match && !selectedDevice) {
+      const device = devices.find((d) => d.id === Number(match[1]));
+      if (device) handleSelectDevice(device);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devices]);
 
   async function handleSaveDevice(id, data) {
     const ports = data.ports.split(',').map((p) => p.trim()).filter(Boolean);
@@ -135,6 +163,17 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     } catch (err) {
       showToast(`Erro ao favoritar: ${err.message}`, 'error');
       await loadAll();
+    }
+  }
+
+  async function handleSetMaintenance(id, until) {
+    try {
+      const updated = await api.setMaintenance(id, until);
+      setDevices((current) => current.map((d) => (d.id === id ? { ...d, maintenanceUntil: updated.maintenanceUntil } : d)));
+      if (selectedDevice?.id === id) setSelectedDevice(updated);
+      showToast(until ? 'Dispositivo em manutenção — alertas silenciados até o fim do período.' : 'Manutenção encerrada.', 'success');
+    } catch (err) {
+      showToast(`Erro ao atualizar manutenção: ${err.message}`, 'error');
     }
   }
 
@@ -286,7 +325,7 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
           </div>
         </div>
 
-        <TopBar colors={colors} monitoring={monitoring} />
+        <TopBar colors={colors} monitoring={monitoring} onEnterTvMode={() => setTvMode(true)} />
 
         <div ref={topRef} style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, scrollMarginTop: 20 }}>
           <div>
@@ -348,6 +387,7 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
           </div>
           <NetworkHistoryChart colors={colors} />
           <LatencyChart colors={colors} />
+          <LocationHealthPanel colors={colors} devices={devices} />
           <TopIssues colors={colors} devices={devices} icons={ICONS} />
         </div>
 
@@ -384,12 +424,13 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
         <DeviceDetailModal
           colors={colors}
           device={selectedDevice}
-          onClose={() => setSelectedDevice(null)}
+          onClose={handleCloseDeviceModal}
           onSave={handleSaveDevice}
           onDelete={handleDeleteDevice}
           onCheckNow={handleCheckNow}
           onIdentifyNow={handleIdentifyNow}
           onToggleFavorite={handleToggleFavorite}
+          onSetMaintenance={handleSetMaintenance}
           checking={checkingId === selectedDevice.id}
           identifying={identifyingId === selectedDevice.id}
         />
@@ -397,6 +438,17 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
 
       <CommandPalette colors={colors} devices={devices} onSelectDevice={handleSelectDevice} />
       <ToastContainer colors={colors} />
+
+      {tvMode && (
+        <TvMode
+          colors={colors}
+          devices={devices}
+          alerts={alerts}
+          heroBanner={heroBanner}
+          indicatorCards={indicatorCards}
+          onExit={() => setTvMode(false)}
+        />
+      )}
     </div>
   );
 }

@@ -87,20 +87,25 @@ async function checkDevice(device, settings, arpTable) {
   });
   insertCheckStmt.run(device.id, now, ping.ok ? 1 : 0, ping.latencyMs);
 
+  // Em manutenção, o histórico/eventos continuam normais — só o alerta
+  // (e o Telegram) fica em silêncio, pra não gerar ruído enquanto alguém
+  // mexe fisicamente no equipamento (ex.: troca de câmera, reboot manual).
+  const inMaintenance = device.maintenanceUntil && new Date(device.maintenanceUntil) > new Date();
+
   if (previousStatus !== status) {
     if (status === 'offline') {
       insertEventStmt.run(device.id, 'went_offline', now);
-      raiseDeviceOffline(device);
+      if (!inMaintenance) raiseDeviceOffline(device);
     } else if (previousStatus === 'offline') {
       insertEventStmt.run(device.id, 'went_online', now);
-      resolveDeviceOffline(device, device.lastOfflineAt ? new Date(device.lastOfflineAt).getTime() : null);
+      if (!inMaintenance) resolveDeviceOffline(device, device.lastOfflineAt ? new Date(device.lastOfflineAt).getTime() : null);
     }
 
     if (status === 'degraded' && previousStatus !== 'offline') {
       insertEventStmt.run(device.id, 'degraded', now);
-      raiseDeviceDegraded(device);
+      if (!inMaintenance) raiseDeviceDegraded(device);
     } else if (previousStatus === 'degraded' && status === 'online') {
-      resolveDeviceDegraded(device);
+      if (!inMaintenance) resolveDeviceDegraded(device);
     }
   }
 

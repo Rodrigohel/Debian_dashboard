@@ -1,7 +1,57 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import Icon, { ICONS, TYPE_META } from './Icon.jsx';
 import { showToast } from '../utils/toast.js';
 import UptimeHeatmap from './UptimeHeatmap.jsx';
+
+const MAINTENANCE_DURATIONS = [
+  { label: '30 min', minutes: 30 },
+  { label: '1 hora', minutes: 60 },
+  { label: '4 horas', minutes: 240 },
+  { label: '24 horas', minutes: 1440 },
+];
+
+function deviceDeepLink(deviceId) {
+  return `${window.location.origin}${window.location.pathname}#device/${deviceId}`;
+}
+
+function QrPanel({ colors, deviceId, onClose }) {
+  const [dataUrl, setDataUrl] = useState(null);
+  const link = deviceDeepLink(deviceId);
+
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(link, { width: 168, margin: 1, color: { dark: '#0F172A', light: '#FFFFFF' } })
+      .then((url) => { if (!cancelled) setDataUrl(url); });
+    return () => { cancelled = true; };
+  }, [link]);
+
+  return (
+    <div style={{
+      position: 'absolute', top: 44, right: 16, zIndex: 20, background: colors.bgCard, border: `1px solid ${colors.border}`,
+      borderRadius: 14, padding: 14, boxShadow: colors.shadowHover || colors.shadow, width: 210,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: colors.textPrimary }}>Acesso rápido</span>
+        <button onClick={onClose} style={{ border: 'none', background: 'transparent', color: colors.textTertiary, cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8, minHeight: 168 }}>
+        {dataUrl ? <img src={dataUrl} alt="QR code" width={168} height={168} style={{ borderRadius: 8 }} /> : (
+          <div style={{ width: 168, height: 168, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: colors.textTertiary }}>Gerando...</div>
+        )}
+      </div>
+      <div style={{ fontSize: 10.5, color: colors.textTertiary, textAlign: 'center', marginBottom: 8 }}>
+        Escaneie pra abrir este dispositivo direto no celular — ótimo pra colar uma etiqueta perto do equipamento.
+      </div>
+      <button
+        onClick={() => copyToClipboard(link, 'Link')}
+        style={{ width: '100%', border: `1px solid ${colors.border}`, background: colors.bgCardAlt, color: colors.textSecondary, borderRadius: 8, padding: '6px 8px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
+      >
+        Copiar link
+      </button>
+    </div>
+  );
+}
 
 const STATUS_META = {
   online: { label: 'Online', color: 'green' },
@@ -66,7 +116,7 @@ function copyToClipboard(text, label) {
 }
 
 export default function DeviceDetailModal({
-  colors, device, onClose, onSave, onDelete, onCheckNow, onIdentifyNow, onToggleFavorite, checking, identifying,
+  colors, device, onClose, onSave, onDelete, onCheckNow, onIdentifyNow, onToggleFavorite, onSetMaintenance, checking, identifying,
 }) {
   const [form, setForm] = useState({
     name: device.name, type: device.type, location: device.location,
@@ -77,9 +127,12 @@ export default function DeviceDetailModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [showMaintenancePicker, setShowMaintenancePicker] = useState(false);
   const statusMeta = STATUS_META[device.status] || STATUS_META.unknown;
   const hints = discoveryHints(device.discoveryInfo);
   const webUrl = `http://${device.ip}${device.ports?.[0] && device.ports[0] !== 80 ? `:${device.ports[0]}` : ''}`;
+  const inMaintenance = device.maintenanceUntil && new Date(device.maintenanceUntil) > new Date();
 
   async function handleSave() {
     setSaving(true);
@@ -105,6 +158,13 @@ export default function DeviceDetailModal({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <Icon paths={(TYPE_META[device.type] || TYPE_META.outro).icon} size={20} color={colors.textSecondary} strokeWidth={2} />
           <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 18, color: colors.textPrimary, flex: 1 }}>{device.name}</div>
+          <button
+            onClick={() => setShowQr((v) => !v)}
+            title="Acesso rápido (QR code)"
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4, display: 'flex' }}
+          >
+            <Icon paths={ICONS.qrCode} size={18} strokeWidth={1.8} color={showQr ? colors.primary : colors.textTertiary} />
+          </button>
           {onToggleFavorite && (
             <button
               onClick={() => onToggleFavorite(device.id, !device.favorite)}
@@ -114,8 +174,9 @@ export default function DeviceDetailModal({
               <Icon paths={ICONS.starFilled} size={19} strokeWidth={1.8} color={device.favorite ? colors.amber : colors.border} />
             </button>
           )}
+          {showQr && <QrPanel colors={colors} deviceId={device.id} onClose={() => setShowQr(false)} />}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, fontSize: 13, color: colors.textSecondary, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, fontSize: 13, color: colors.textSecondary, flexWrap: 'wrap' }}>
           <span style={{ fontFamily: 'monospace' }}>{device.ip}</span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 700, color: colors[statusMeta.color] }}>
             <span style={{ width: 7, height: 7, borderRadius: 99, background: colors[statusMeta.color] }} /> {statusMeta.label}
@@ -124,6 +185,47 @@ export default function DeviceDetailModal({
             <span style={{ color: colors.textTertiary, fontSize: 12.5 }}>· Uptime 7 dias: <strong style={{ color: colors.textSecondary }}>{device.uptime7d}%</strong></span>
           )}
         </div>
+
+        {onSetMaintenance && (
+          <div style={{ marginBottom: 18 }}>
+            {inMaintenance ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: `${colors.amber}14`, border: `1px solid ${colors.amber}55`, borderRadius: 10, padding: '8px 12px' }}>
+                <Icon paths={ICONS.wrench} size={14} strokeWidth={2.2} color={colors.amber} />
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.amber, flex: 1 }}>
+                  Em manutenção até {new Date(device.maintenanceUntil).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} — alertas silenciados
+                </span>
+                <button
+                  onClick={() => onSetMaintenance(device.id, null)}
+                  style={{ border: `1px solid ${colors.amber}`, background: 'transparent', color: colors.amber, borderRadius: 8, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Encerrar
+                </button>
+              </div>
+            ) : (
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowMaintenancePicker((v) => !v)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: `1px solid ${colors.border}`, background: colors.bgCard, color: colors.textSecondary, borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  <Icon paths={ICONS.wrench} size={13} strokeWidth={2.2} /> Colocar em manutenção
+                </button>
+                {showMaintenancePicker && (
+                  <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 15, background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 8, boxShadow: colors.shadow, display: 'flex', gap: 6, flexWrap: 'wrap', width: 260 }}>
+                    {MAINTENANCE_DURATIONS.map((d) => (
+                      <button
+                        key={d.minutes}
+                        onClick={() => { onSetMaintenance(device.id, new Date(Date.now() + d.minutes * 60000).toISOString()); setShowMaintenancePicker(false); }}
+                        style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, color: colors.textPrimary, borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Latência recente</div>

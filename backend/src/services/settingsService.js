@@ -19,6 +19,11 @@ const DEFAULTS = {
   alertReminderIntervalMinutes: String(process.env.ALERT_REMINDER_INTERVAL_MINUTES || 60),
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
+  // 'off' | 'weekly' | 'monthly' — envia o relatório executivo em PDF
+  // automaticamente pelo Telegram já configurado (ver executiveReportScheduler).
+  executiveReportFrequency: process.env.EXECUTIVE_REPORT_FREQUENCY || 'off',
+  // Bookkeeping interno do agendador — não editável pela tela de Configurações.
+  executiveReportLastSentAt: '',
 };
 
 const ALLOWED_KEYS = new Set(Object.keys(DEFAULTS));
