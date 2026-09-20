@@ -42,16 +42,31 @@ function Sparkline({ colors, checks }) {
   );
 }
 
+function discoveryHints(discoveryInfo) {
+  if (!discoveryInfo) return [];
+  const hints = [];
+  if (discoveryInfo.friendlyName) hints.push(`Nome anunciado na rede: "${discoveryInfo.friendlyName}"`);
+  if (discoveryInfo.onvif?.model) hints.push(`ONVIF: ${discoveryInfo.onvif.model}`);
+  if (discoveryInfo.ssdp?.manufacturer || discoveryInfo.ssdp?.model) {
+    hints.push(`SSDP/UPnP: ${[discoveryInfo.ssdp.manufacturer, discoveryInfo.ssdp.model].filter(Boolean).join(' ')}`);
+  }
+  if (discoveryInfo.http?.server) hints.push(`Servidor web: ${discoveryInfo.http.server}`);
+  if (discoveryInfo.http?.title) hints.push(`Título da página: "${discoveryInfo.http.title}"`);
+  return hints;
+}
+
 export default function DeviceDetailModal({
-  colors, device, onClose, onSave, onDelete, onCheckNow, checking,
+  colors, device, onClose, onSave, onDelete, onCheckNow, onIdentifyNow, checking, identifying,
 }) {
   const [form, setForm] = useState({
     name: device.name, type: device.type, location: device.location,
     ports: device.ports.join(', '), notes: device.notes, enabled: device.enabled,
+    mac: device.mac || '', vendor: device.vendor || '', model: device.model || '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const statusMeta = STATUS_META[device.status] || STATUS_META.unknown;
+  const hints = discoveryHints(device.discoveryInfo);
 
   async function handleSave() {
     setSaving(true);
@@ -88,6 +103,41 @@ export default function DeviceDetailModal({
         <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Latência recente</div>
           <Sparkline colors={colors} checks={device.recentChecks} />
+        </div>
+
+        <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em' }}>Identificação</div>
+            <button
+              type="button"
+              onClick={() => onIdentifyNow(device.id)}
+              disabled={identifying}
+              style={{ border: 'none', background: 'transparent', color: colors.primary, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0 }}
+            >
+              <Icon paths={ICONS.search} size={13} strokeWidth={2.2} /> {identifying ? 'Identificando...' : 'Identificar agora'}
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>MAC</label>
+              <input value={form.mac} onChange={(e) => setForm({ ...form, mac: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Fabricante</label>
+              <input value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Modelo</label>
+              <input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }} />
+            </div>
+          </div>
+          {hints.length > 0 && (
+            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {hints.map((hint, i) => (
+                <div key={i} style={{ fontSize: 11.5, color: colors.textTertiary }}>{hint}</div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>

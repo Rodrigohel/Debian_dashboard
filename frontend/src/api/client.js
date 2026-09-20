@@ -1,5 +1,16 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
-const WS_URL = import.meta.env.VITE_WS_URL || API_URL.replace(/^http/, 'ws') + '/ws';
+// Em produção (instalador padrão), o próprio backend serve este frontend
+// buildado na mesma origem — então o caminho relativo ('') já basta e
+// continua funcionando não importa o IP/host usado para acessar (LAN,
+// Tailscale, etc.), sem precisar rebuildar. VITE_API_URL só é necessário
+// quando frontend e backend rodam em portas/hosts diferentes (`npm run
+// dev`, ou um reverse proxy dedicado — ver frontend/.env.example).
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3002' : '');
+
+function defaultWsUrl() {
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${window.location.host}/ws`;
+}
+const WS_URL = import.meta.env.VITE_WS_URL || (API_URL ? `${API_URL.replace(/^http/, 'ws')}/ws` : defaultWsUrl());
 
 export const TOKEN_KEY = 'ip_dashboard_token';
 
@@ -60,6 +71,8 @@ export const api = {
   updateDevice: (id, data) => request(`/api/devices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteDevice: (id) => request(`/api/devices/${id}`, { method: 'DELETE' }),
   checkDeviceNow: (id) => request(`/api/devices/${id}/check`, { method: 'POST' }),
+  identifyDevice: (id) => request(`/api/devices/${id}/identify`, { method: 'POST' }),
+  identifyAll: (ids) => request('/api/devices/identify-all', { method: 'POST', body: JSON.stringify({ ids }) }),
   summary: () => request('/api/devices/summary'),
   scanNetwork: (params) => request('/api/devices/scan', { method: 'POST', body: JSON.stringify(params || {}) }),
   importDevices: async (file) => {

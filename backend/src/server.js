@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import http from 'node:http';
 import path from 'node:path';
+import fs from 'node:fs';
 import { WebSocketServer } from 'ws';
 import { config } from './config.js';
 import { authRouter } from './routes/auth.js';
@@ -33,6 +34,18 @@ app.use('/api/settings', requireAuth, requireAdmin, settingsRouter);
 app.use('/api/users', requireAuth, requireAdmin, usersRouter);
 app.use('/api/devices', requireAuth, devicesRouter);
 app.use('/api/alerts', requireAuth, alertsRouter);
+
+// Serve o próprio frontend buildado (frontend/dist, pasta irmã de backend/),
+// quando presente — assim um único processo Node atende tudo (API, WS e a
+// interface web) numa porta só, sem precisar de Nginx/Apache na frente.
+// Em desenvolvimento (frontend rodando via `vite dev` em outra porta) essa
+// pasta simplesmente não existe e isso não faz nada.
+const frontendDist = path.resolve(process.env.FRONTEND_DIST_PATH || path.join(process.cwd(), '../frontend/dist'));
+if (fs.existsSync(path.join(frontendDist, 'index.html'))) {
+  app.use(express.static(frontendDist));
+  app.get(/^(?!\/api|\/ws).*/, (req, res) => res.sendFile(path.join(frontendDist, 'index.html')));
+  console.log(`[ip-dashboard-backend] servindo frontend estático de ${frontendDist}`);
+}
 
 const server = http.createServer(app);
 

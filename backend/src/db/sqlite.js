@@ -30,6 +30,10 @@ db.exec(`
     ports TEXT NOT NULL DEFAULT '[]', -- JSON: portas TCP a checar além do ping (ex.: [80,554])
     notes TEXT NOT NULL DEFAULT '',
     enabled INTEGER NOT NULL DEFAULT 1,
+    mac TEXT NOT NULL DEFAULT '',            -- descoberto via tabela ARP (ver macService)
+    vendor TEXT NOT NULL DEFAULT '',         -- fabricante a partir do MAC (base IEEE OUI)
+    model TEXT NOT NULL DEFAULT '',          -- modelo, via ONVIF/SSDP/HTTP (best-effort)
+    discovery_info TEXT NOT NULL DEFAULT '{}', -- JSON bruto com tudo que os probes acharam
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -85,3 +89,17 @@ db.exec(`
     value TEXT
   );
 `);
+
+// Migração leve: `CREATE TABLE IF NOT EXISTS` acima não adiciona colunas
+// novas a um banco já existente — precisa de ALTER TABLE explícito. Isso
+// permite atualizar o painel (git pull + restart) sem perder o cadastro de
+// dispositivos já feito.
+const deviceColumns = db.prepare('PRAGMA table_info(devices)').all().map((c) => c.name);
+for (const [column, ddl] of [
+  ['mac', "ALTER TABLE devices ADD COLUMN mac TEXT NOT NULL DEFAULT ''"],
+  ['vendor', "ALTER TABLE devices ADD COLUMN vendor TEXT NOT NULL DEFAULT ''"],
+  ['model', "ALTER TABLE devices ADD COLUMN model TEXT NOT NULL DEFAULT ''"],
+  ['discovery_info', "ALTER TABLE devices ADD COLUMN discovery_info TEXT NOT NULL DEFAULT '{}'"],
+]) {
+  if (!deviceColumns.includes(column)) db.exec(ddl);
+}

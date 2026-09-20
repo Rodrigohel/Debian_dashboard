@@ -43,6 +43,8 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
   const [scanning, setScanning] = useState(false);
   const [importing, setImporting] = useState(false);
   const [checkingId, setCheckingId] = useState(null);
+  const [identifyingId, setIdentifyingId] = useState(null);
+  const [identifyingAll, setIdentifyingAll] = useState(false);
 
   const topRef = useRef(null);
   const devicesSectionRef = useRef(null);
@@ -123,6 +125,30 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     }
   }
 
+  async function handleIdentifyNow(id) {
+    setIdentifyingId(id);
+    try {
+      const updated = await api.identifyDevice(id);
+      setSelectedDevice(updated);
+      await loadAll();
+    } finally {
+      setIdentifyingId(null);
+    }
+  }
+
+  async function handleIdentifyAll() {
+    setIdentifyingAll(true);
+    try {
+      const result = await api.identifyAll();
+      await loadAll();
+      alert(`Identificação concluída: ${result.identified} dispositivo(s) verificado(s) (MAC, fabricante e modelo, quando encontrados).`);
+    } catch (err) {
+      alert(`Erro ao identificar: ${err.message}`);
+    } finally {
+      setIdentifyingAll(false);
+    }
+  }
+
   async function handleCreateDevice(data) {
     const ports = data.ports.split(',').map((p) => p.trim()).filter(Boolean);
     await api.createDevice({ ...data, ports });
@@ -134,7 +160,7 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     try {
       const result = await api.scanNetwork({});
       await loadAll();
-      alert(`Varredura concluída: ${result.respondingCount} IPs responderam, ${result.createdCount} novos cadastrados automaticamente (classifique-os na lista).`);
+      alert(`Varredura concluída: ${result.respondingCount} IPs responderam, ${result.createdCount} novos cadastrados e identificados automaticamente (confira nome/tipo/local na lista).`);
     } catch (err) {
       alert(`Erro na varredura: ${err.message}`);
     } finally {
@@ -265,8 +291,10 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
             onScan={handleScan}
             onImport={handleImport}
             onExport={handleExport}
+            onIdentifyAll={handleIdentifyAll}
             scanning={scanning}
             importing={importing}
+            identifying={identifyingAll}
           />
         </div>
 
@@ -298,7 +326,9 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
           onSave={handleSaveDevice}
           onDelete={handleDeleteDevice}
           onCheckNow={handleCheckNow}
+          onIdentifyNow={handleIdentifyNow}
           checking={checkingId === selectedDevice.id}
+          identifying={identifyingId === selectedDevice.id}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 import { pingHost } from './pingService.js';
 import { runWithConcurrency } from './monitorService.js';
 import { upsertDeviceByIp, listDevices } from './devicesService.js';
+import { identifyDevices } from './identifyService.js';
 
 /**
  * Varredura de ping no prefixo /24 (ex.: "192.168.1", .1 a .254) para achar
@@ -32,5 +33,17 @@ export async function scanNetwork({ base, start = 1, end = 254, timeoutMs = 800,
   }
 
   found.sort((a, b) => a.ip.localeCompare(b.ip, undefined, { numeric: true }));
-  return { scanned: candidates.length, respondingCount: found.length, responding: found, createdCount: created.length, created };
+
+  // Identifica (MAC/fabricante/modelo) os recém-cadastrados na hora — assim
+  // "Escanear rede" já entrega a lista pronta para classificar, em vez de
+  // exigir um segundo clique em "Identificar tudo" logo em seguida.
+  let identified = [];
+  if (created.length > 0) {
+    identified = await identifyDevices(created.map((d) => d.id));
+  }
+
+  return {
+    scanned: candidates.length, respondingCount: found.length, responding: found,
+    createdCount: created.length, created: identified.length > 0 ? identified : created,
+  };
 }

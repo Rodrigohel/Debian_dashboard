@@ -3,55 +3,76 @@
 Painel de monitoramento em tempo real para os equipamentos de rede fixos
 (NVRs, câmeras, porteiros, interfones, switches, APs etc.): mostra o status
 de cada IP (online / offline / degradado), sinaliza na hora quando um
-equipamento fica sem conexão e manda alerta (e opcionalmente Telegram)
-quando isso acontece.
+equipamento fica sem conexão, **descobre automaticamente MAC, fabricante e
+modelo** de cada dispositivo, e manda alerta (e opcionalmente Telegram)
+quando algo cai.
 
 Construído nos mesmos moldes do painel de PBX/Asterisk já usado
 ([FreePBX_Asterisk](https://github.com/Rodrigohel/FreePBX_Asterisk)): mesma
 stack (Node/Express + WebSocket + SQLite no backend, React/Vite no
 frontend), mesma paleta visual, mesmo esquema de autenticação (JWT) e painel
-público opcional, e mesmo padrão de deploy como serviço systemd num Debian.
+público opcional.
 
 - **`backend/`** — API REST + WebSocket em Node.js/Express. Verifica cada IP
   cadastrado por **ping (ICMP)** e, opcionalmente, por **checagem de porta
-  TCP** (ex.: porta HTTP da câmera, RTSP do NVR), a cada poucos segundos.
-  Guarda status, histórico de latência e eventos de queda/recuperação em
-  SQLite, com autenticação por usuário/senha (JWT).
+  TCP**, a cada poucos segundos. Descobre **MAC** (tabela ARP do kernel),
+  **fabricante** (base oficial IEEE OUI) e, best-effort, **marca/modelo**
+  (ONVIF/WS-Discovery, SSDP/UPnP, fingerprint da interface web). Guarda
+  status, histórico de latência e eventos de queda/recuperação em SQLite,
+  com autenticação por usuário/senha (JWT).
 - **`frontend/`** — aplicação React (Vite) com o painel de dispositivos,
   filtros por tipo/status, busca, alertas, varredura de rede e importação em
-  massa via CSV.
+  massa via CSV. **O próprio backend serve este frontend já buildado** — um
+  processo só, uma porta só, sem precisar de Nginx/Apache.
+- **`install.sh`** — instalador automatizado de ponta a ponta.
 
-## Onde isso roda
+## Instalação — um único comando
 
-Pensado para rodar **no mesmo servidor Debian onde já roda o painel do
-PBX**, como mais um serviço independente:
+```bash
+git clone -b claude/network-ip-monitoring-dashboard-mjksqv https://github.com/rodrigohel/debian_dashboard.git /opt/ip-dashboard
+cd /opt/ip-dashboard
+sudo ./install.sh
+```
 
-- o backend não precisa de root: usa o `ping` do sistema (pacote
-  `iputils-ping`, que no Debian já roda sem privilégio elevado) e sockets TCP
-  comuns — nenhum socket raw dentro do Node;
-- roda como processo Node próprio (porta configurável, padrão `3002`,
-  diferente da porta `3001` do painel do PBX);
-- o frontend é build estático (`frontend/dist`) e pode ser servido pelo
-  mesmo Nginx/Apache que já roda no servidor, num subcaminho separado
-  (ex.: `/ip-dashboard/`), do mesmo jeito que o painel do PBX.
+O script faz tudo sozinho: instala Node.js 20 e `iputils-ping`, copia o
+projeto para `/opt/ip-dashboard` (se você rodou de outro lugar), cria um
+usuário de sistema dedicado, instala as dependências, gera o `.env` do
+backend com um segredo aleatório, cria o primeiro usuário admin, builda o
+frontend e registra tudo como serviço systemd (`ip-dashboard-backend`),
+já habilitado para iniciar sozinho no boot. No fim ele imprime o endereço
+para acessar e, se você não informou usuário/senha, o login gerado
+automaticamente (**anote na hora**, só aparece uma vez).
+
+É **idempotente**: depois de um `git pull`, rodar `sudo ./install.sh` de
+novo atualiza tudo sem apagar dispositivos cadastrados nem resetar a senha
+do admin.
+
+Tudo pode ser pré-definido por variável de ambiente para instalação 100%
+não-interativa (útil em automação):
+
+```bash
+sudo NETWORK_BASE=192.168.1 COMPANY_NAME="Meu Condomínio" \
+     ADMIN_USER=admin ADMIN_PASSWORD='troque-esta-senha' \
+     BACKEND_PORT=3002 ./install.sh
+```
+
+Depois de instalado, acesse `http://IP-DO-SERVIDOR:3002` (na rede local ou
+pelo IP do Tailscale — ver seção abaixo).
+
+> Prefere instalar manualmente passo a passo, ou entender o que o script faz
+> por dentro? Veja "Instalação manual" no fim deste README.
 
 ### Acesso remoto (Tailscale)
 
 Como a máquina já tem o Tailscale configurado, **não é preciso nenhuma
 configuração extra de rede** para acessar o painel de fora: o backend escuta
 em `0.0.0.0` de propósito, então basta acessar pelo IP Tailscale da máquina
-(`tailscale ip -4`) na porta do backend/frontend, exatamente como já é feito
-para o painel do PBX. Se você serve o frontend pelo Nginx/Apache que já
-atende o painel do PBX, o mesmo host/porta que você já usa por Tailscale
-passa a servir também `/ip-dashboard/` — nenhuma regra nova de firewall ou
-do Tailscale é necessária, só a configuração do site web (ver seção 6
-abaixo). Se preferir acessar direto na porta do backend/dev sem proxy,
-libere a porta apenas na interface Tailscale, nunca na interface da
-internet:
+(`tailscale ip -4`) na mesma porta, exatamente como já é feito para o painel
+do PBX. Se tiver firewall (`ufw`) ativo, libere a porta só na interface do
+Tailscale, nunca na da internet:
 
 ```bash
 sudo ufw allow in on tailscale0 to any port 3002
-sudo ufw allow in on tailscale0 to any port 5174
 ```
 
 ## Login é obrigatório?
@@ -60,9 +81,40 @@ Só para ver e editar a lista completa de dispositivos. A página abre num
 **painel público** (você escolhe quais cards aparecem ali — ver "Painel
 público" abaixo); para ver a lista com IP/nome de cada equipamento,
 adicionar/remover dispositivos, escanear a rede ou configurar alertas, é
-preciso logar clicando em "Entrar". O primeiro usuário é criado com
-`npm run seed:user` (não existe usuário padrão pré-cadastrado, por
-segurança).
+preciso logar clicando em "Entrar".
+
+## MAC, fabricante e modelo — como funciona
+
+Não existe API universal que devolva "marca e modelo" de qualquer
+equipamento de rede — o painel combina várias fontes, cada uma cobrindo uma
+fatia diferente dos ~230 dispositivos, tudo automático:
+
+- **MAC**: lido direto da tabela ARP do kernel (`/proc/net/arp`), populada
+  de graça pelo próprio ping — nenhuma consulta extra é feita. Preenchido
+  sozinho a cada rodada de monitoramento, para todo dispositivo online.
+- **Fabricante**: derivado do MAC pela base oficial **IEEE OUI** (pacote
+  `oui-data`, ~54 mil fabricantes registrados, atualizado automaticamente
+  via `npm install` — sem download manual). Assim que o MAC é conhecido, o
+  fabricante aparece sozinho.
+- **Marca/modelo** (best-effort, mais lento): botão **"Identificar agora"**
+  (um dispositivo) ou **"Identificar tudo"** (todos de uma vez) combinam:
+  - **ONVIF/WS-Discovery** — padrão que a maioria das câmeras IP e NVRs
+    profissionais (Hikvision, Dahua, Intelbras, Axis...) usa para se
+    anunciar na rede; costuma trazer o modelo exato.
+  - **SSDP/UPnP** — usado por roteadores, NVRs e outros equipamentos de
+    rede/consumo; a resposta aponta para um XML com fabricante/modelo.
+  - **Fingerprint HTTP** — título da página e cabeçalho `Server` da
+    interface web do equipamento, quando as duas fontes acima não
+    respondem.
+- O botão **"Escanear rede"** já roda a identificação automaticamente em
+  todo dispositivo novo que encontrar — não precisa de um segundo clique.
+- Nenhuma dessas fontes exige senha/credencial do equipamento, e nenhuma é
+  garantida — cada modelo real responde a um subconjunto diferente delas.
+  MAC e fabricante, os dois campos mais confiáveis, também podem ser
+  editados manualmente no detalhe do dispositivo se precisar corrigir algo
+  (comum em produtos com marca própria montados sobre hardware OEM, ex.:
+  vários equipamentos vendidos como "Intelbras" usam chipset/MAC de
+  fabricantes chineses parceiros).
 
 ## Cadastrando os ~230 dispositivos
 
@@ -71,9 +123,9 @@ Três formas de popular a lista, pode combinar as três:
 1. **Varredura de rede** (mais rápido para começar): na tela de
    Dispositivos, clique em **"Escanear rede"** — o backend faz um ping
    sweep no prefixo configurado em `NETWORK_BASE` (padrão `192.168.1`, de
-   `.1` a `.254`) e cadastra automaticamente todo IP que responder e ainda
-   não estiver na lista, como tipo "Outro". Depois é só abrir cada um e
-   preencher nome/tipo/local reais.
+   `.1` a `.254`), cadastra automaticamente todo IP que responder e ainda
+   não estiver na lista, e já roda a identificação (MAC/fabricante/modelo)
+   nesses novos. Depois é só abrir cada um e ajustar nome/tipo/local.
 2. **Importação em massa por CSV**: preencha uma planilha com as colunas
    `ip,name,type,location,ports,notes` (veja
    `backend/samples/devices.sample.csv` como modelo — os tipos aceitos são
@@ -88,7 +140,8 @@ Três formas de popular a lista, pode combinar as três:
 3. **Cadastro manual**, um por um, pelo botão **"Adicionar"**.
 
 A qualquer momento dá para **exportar a lista atual para CSV** (botão
-"Exportar CSV"), editar em planilha e reimportar.
+"Exportar CSV", inclui MAC/fabricante/modelo já descobertos), editar em
+planilha e reimportar.
 
 ### Portas TCP (opcional, por dispositivo)
 
@@ -110,118 +163,6 @@ depende só do ping.
 | Quais cards aparecem no painel público (sem login) | `backend/.env` → `PUBLIC_SHOW_*` (reiniciar o backend depois de mudar) |
 | Prefixo de rede usado pelo "Escanear rede" | `backend/.env` → `NETWORK_BASE` |
 
-## Instalação no Debian — passo a passo
-
-Assume um Debian com acesso root/sudo via SSH (pode ser o mesmo servidor do
-PBX, ou outro).
-
-### 1. Instalar dependências do sistema
-
-```bash
-# Node.js 20 LTS (o repositório padrão do Debian costuma ser antigo demais)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-
-# ping (iputils-ping) — normalmente já vem instalado no Debian, mas confirme:
-sudo apt install -y iputils-ping
-node -v   # deve mostrar v20.x
-ping -c1 127.0.0.1   # deve funcionar sem sudo
-```
-
-### 2. Copiar o projeto para o servidor
-
-```bash
-sudo mkdir -p /opt/ip-dashboard
-sudo chown $USER:$USER /opt/ip-dashboard
-git clone -b claude/network-ip-monitoring-dashboard-mjksqv https://github.com/rodrigohel/debian_dashboard.git /opt/ip-dashboard
-cd /opt/ip-dashboard
-```
-
-Ou, sem Git no servidor, direto da sua máquina:
-
-```bash
-rsync -avz --exclude node_modules --exclude dist --exclude data ./ usuario@ip-do-servidor:/opt/ip-dashboard/
-```
-
-### 3. Criar o usuário de sistema que vai rodar o backend
-
-```bash
-sudo useradd --system --home /opt/ip-dashboard --shell /usr/sbin/nologin ip-dashboard
-sudo chown -R ip-dashboard:ip-dashboard /opt/ip-dashboard
-```
-
-### 4. Configurar e subir o backend
-
-```bash
-cd /opt/ip-dashboard/backend
-npm install --omit=dev
-cp .env.example .env
-nano .env   # ajuste NETWORK_BASE, JWT_SECRET, TELEGRAM_* se quiser, etc.
-npm run seed:user   # cria o primeiro usuário do painel
-npm start            # testa manualmente — Ctrl+C depois de confirmar
-```
-
-Confirme em outro terminal: `curl http://localhost:3002/health`.
-
-Se já tiver a planilha com os ~230 IPs pronta:
-```bash
-npm run import:devices /caminho/para/dispositivos.csv
-```
-
-### 5. Configurar e buildar o frontend
-
-```bash
-cd /opt/ip-dashboard/frontend
-npm install
-cp .env.example .env
-nano .env
-# VITE_API_URL=http://IP-OU-DOMINIO-DO-SERVIDOR:3002
-# VITE_WS_URL=ws://IP-OU-DOMINIO-DO-SERVIDOR:3002/ws
-# Se for servir num subcaminho (ex.: /ip-dashboard/), defina também:
-# VITE_BASE_PATH=/ip-dashboard/
-npm run build
-```
-
-Gera os arquivos estáticos em `frontend/dist`.
-
-### 6. Deixar o backend sempre rodando (systemd)
-
-Um modelo pronto está em `deploy/systemd/ip-dashboard-backend.service`:
-
-```bash
-sudo cp deploy/systemd/ip-dashboard-backend.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now ip-dashboard-backend
-sudo systemctl status ip-dashboard-backend
-```
-
-### 7. Servir o frontend pelo servidor web já existente
-
-Descubra qual está ativo: `systemctl is-active apache2 nginx 2>/dev/null`.
-
-**Nginx** — copie o conteúdo de `deploy/nginx/ip-dashboard.conf` para dentro
-do bloco `server { ... }` do seu site (mesmo arquivo que já serve o painel
-do PBX, se for o caso), depois:
-```bash
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-**Apache** — use o modelo pronto:
-```bash
-sudo cp deploy/apache/ip-dashboard.conf /etc/apache2/conf-available/
-sudo a2enmod proxy proxy_http proxy_wstunnel
-sudo a2enconf ip-dashboard
-sudo systemctl reload apache2
-```
-
-Acesse `http://IP-OU-DOMINIO/ip-dashboard/` (na rede local ou pelo IP
-Tailscale da máquina) — deve aparecer o painel público com o botão
-"Entrar".
-
-> Se preferir servir na raiz do domínio (sem `/ip-dashboard/`), ajuste as
-> regras para `/`, `/api/` e `/ws`, e refaça o build do frontend com
-> `VITE_BASE_PATH` vazio.
-
 ## Endpoints do backend
 
 - `GET /health` — healthcheck, sem autenticação.
@@ -231,9 +172,12 @@ Tailscale da máquina) — deve aparecer o painel público com o botão
 - `GET/POST/PUT/DELETE /api/devices` — CRUD de dispositivos, protegido por
   `Authorization: Bearer <token>` (criar/editar/remover exige admin).
 - `GET /api/devices/summary` — contagem online/offline/degradado, por tipo.
-- `POST /api/devices/scan` — varredura de ping na rede.
+- `POST /api/devices/scan` — varredura de ping na rede (já identifica os
+  novos automaticamente).
 - `POST /api/devices/import` / `GET /api/devices/export` — CSV em massa.
-- `POST /api/devices/:id/check` — força uma verificação imediata.
+- `POST /api/devices/:id/check` — força uma verificação de ping imediata.
+- `POST /api/devices/:id/identify` / `POST /api/devices/identify-all` — MAC,
+  fabricante e modelo (ONVIF/SSDP/HTTP).
 - `GET /api/alerts` — histórico de alertas ativos/resolvidos.
 - `GET/PUT /api/settings`, `POST /api/settings/telegram/test` — configuração.
 - WebSocket em `/ws` — push do status de todos os dispositivos a cada rodada
@@ -252,3 +196,67 @@ cd frontend && npm install && cp .env.example .env && npm run dev
 Acesse `http://localhost:5174`. Sem `iputils-ping` instalado localmente, os
 pings simplesmente falham e tudo aparece como offline — instale com
 `sudo apt install iputils-ping` (Debian/Ubuntu) para testar de verdade.
+
+## Instalação manual (sem o install.sh)
+
+Só necessário se quiser controlar cada passo manualmente, ou entender o que
+o instalador faz por dentro.
+
+### 1. Dependências do sistema
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs iputils-ping
+node -v   # deve mostrar v20.x
+ping -c1 127.0.0.1   # deve funcionar sem sudo
+```
+
+### 2. Copiar o projeto e criar o usuário de sistema
+
+```bash
+sudo mkdir -p /opt/ip-dashboard
+git clone -b claude/network-ip-monitoring-dashboard-mjksqv https://github.com/rodrigohel/debian_dashboard.git /opt/ip-dashboard
+sudo useradd --system --home /opt/ip-dashboard --shell /usr/sbin/nologin ip-dashboard
+```
+
+### 3. Backend
+
+```bash
+cd /opt/ip-dashboard/backend
+npm install --omit=dev
+cp .env.example .env
+nano .env   # ajuste NETWORK_BASE, JWT_SECRET, TELEGRAM_* se quiser, etc.
+npm run seed:user   # cria o primeiro usuário do painel
+```
+
+### 4. Frontend
+
+```bash
+cd /opt/ip-dashboard/frontend
+npm install
+npm run build   # gera frontend/dist — o backend serve isso sozinho
+```
+
+### 5. systemd
+
+```bash
+sudo cp /opt/ip-dashboard/deploy/systemd/ip-dashboard-backend.service /etc/systemd/system/
+sudo sed -i "s#/opt/ip-dashboard#$(cd /opt/ip-dashboard && pwd)#g" /etc/systemd/system/ip-dashboard-backend.service
+sudo chown -R ip-dashboard:ip-dashboard /opt/ip-dashboard
+sudo systemctl daemon-reload
+sudo systemctl enable --now ip-dashboard-backend
+sudo systemctl status ip-dashboard-backend
+```
+
+Acesse `http://IP-DO-SERVIDOR:3002` — deve aparecer o painel público.
+
+### Servir atrás de um Nginx/Apache dedicado (opcional)
+
+O backend já serve o frontend sozinho — isso só é necessário se você quiser
+expor o painel num subcaminho de um domínio que já existe (ex.:
+`http://seu-dominio/ip-dashboard/`), reaproveitando um Nginx/Apache já
+configurado para outra coisa (como o painel do PBX). Modelos prontos em
+`deploy/nginx/ip-dashboard.conf` e `deploy/apache/ip-dashboard.conf` —
+nesse caso, rebuilde o frontend com `VITE_BASE_PATH=/ip-dashboard/` e
+`VITE_API_URL`/`VITE_WS_URL` apontando para esse subcaminho antes do
+`npm run build` (ver comentários em `frontend/.env.example`).

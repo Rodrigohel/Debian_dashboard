@@ -3,11 +3,12 @@ import { db } from '../db/sqlite.js';
 export const DEVICE_TYPES = ['nvr', 'camera', 'porteiro', 'interfone', 'switch', 'ap', 'servidor', 'outro'];
 
 const insertStmt = db.prepare(`
-  INSERT INTO devices (ip, name, type, location, ports, notes, enabled)
-  VALUES (@ip, @name, @type, @location, @ports, @notes, @enabled)
+  INSERT INTO devices (ip, name, type, location, ports, notes, enabled, mac, vendor, model)
+  VALUES (@ip, @name, @type, @location, @ports, @notes, @enabled, @mac, @vendor, @model)
 `);
 const updateStmt = db.prepare(`
-  UPDATE devices SET ip=@ip, name=@name, type=@type, location=@location, ports=@ports, notes=@notes, enabled=@enabled
+  UPDATE devices SET ip=@ip, name=@name, type=@type, location=@location, ports=@ports, notes=@notes,
+         enabled=@enabled, mac=@mac, vendor=@vendor, model=@model
   WHERE id=@id
 `);
 const deleteStmt = db.prepare('DELETE FROM devices WHERE id = ?');
@@ -58,6 +59,9 @@ function rowToDevice(row) {
     ports: JSON.parse(row.ports || '[]'),
     notes: row.notes,
     enabled: !!row.enabled,
+    mac: row.mac || '',
+    vendor: row.vendor || '',
+    model: row.model || '',
     status: row.status || 'unknown',
     latencyMs: row.latencyMs ?? null,
     lastCheckAt: row.lastCheckAt || null,
@@ -83,6 +87,7 @@ export function getDevice(id) {
   const device = rowToDevice(row);
   device.recentChecks = recentChecksStmt.all(id).reverse().map((c) => ({ at: c.at, ok: !!c.ok, latencyMs: c.latencyMs }));
   device.recentEvents = recentEventsStmt.all(id);
+  try { device.discoveryInfo = JSON.parse(row.discovery_info || '{}'); } catch { device.discoveryInfo = {}; }
   return device;
 }
 
@@ -100,6 +105,9 @@ export function createDevice(input) {
     ports: normalizePorts(input.ports),
     notes: String(input.notes || '').trim(),
     enabled: input.enabled === false ? 0 : 1,
+    mac: String(input.mac || '').trim().toLowerCase(),
+    vendor: String(input.vendor || '').trim(),
+    model: String(input.model || '').trim(),
   });
   ensureStatusStmt.run(info.lastInsertRowid);
   return getDevice(info.lastInsertRowid);
@@ -121,6 +129,9 @@ export function updateDevice(id, input) {
     ports: input.ports !== undefined ? normalizePorts(input.ports) : existing.ports,
     notes: input.notes !== undefined ? String(input.notes).trim() : existing.notes,
     enabled: input.enabled === undefined ? existing.enabled : (input.enabled ? 1 : 0),
+    mac: input.mac !== undefined ? String(input.mac).trim().toLowerCase() : existing.mac,
+    vendor: input.vendor !== undefined ? String(input.vendor).trim() : existing.vendor,
+    model: input.model !== undefined ? String(input.model).trim() : existing.model,
   });
   return getDevice(id);
 }

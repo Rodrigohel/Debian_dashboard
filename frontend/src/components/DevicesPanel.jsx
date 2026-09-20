@@ -71,7 +71,8 @@ function FilterChip({ colors, active, onClick, label, count, color }) {
 }
 
 export default function DevicesPanel({
-  colors, devices, onSelectDevice, onAddDevice, onScan, onImport, onExport, scanning, importing,
+  colors, devices, onSelectDevice, onAddDevice, onScan, onImport, onExport, onIdentifyAll,
+  scanning, importing, identifying,
 }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState(null);
@@ -124,6 +125,9 @@ export default function DevicesPanel({
           <ToolbarButton colors={colors} onClick={onExport}>
             <Icon paths={ICONS.download} size={14} strokeWidth={2.2} /> Exportar CSV
           </ToolbarButton>
+          <ToolbarButton colors={colors} onClick={onIdentifyAll} disabled={identifying}>
+            <Icon paths={ICONS.search} size={14} strokeWidth={2.2} /> {identifying ? 'Identificando...' : 'Identificar tudo'}
+          </ToolbarButton>
         </div>
       </div>
 
@@ -154,12 +158,12 @@ export default function DevicesPanel({
         </div>
       </div>
 
-      <div style={{ maxHeight: 520, overflowY: 'auto', borderRadius: 12, border: `1px solid ${colors.border}` }}>
+      <div style={{ maxHeight: 520, overflow: 'auto', borderRadius: 12, border: `1px solid ${colors.border}` }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ position: 'sticky', top: 0, background: colors.bgCardAlt, zIndex: 1 }}>
-              {['Status', 'Nome', 'IP', 'Tipo', 'Local', 'Latência', 'Última checagem'].map((h) => (
-                <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: colors.textTertiary, borderBottom: `1px solid ${colors.border}` }}>
+              {['Status', 'Nome', 'IP', 'MAC', 'Tipo', 'Fabricante / Modelo', 'Local', 'Latência', 'Última checagem'].map((h) => (
+                <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: colors.textTertiary, borderBottom: `1px solid ${colors.border}`, whiteSpace: 'nowrap' }}>
                   {h}
                 </th>
               ))}
@@ -176,23 +180,27 @@ export default function DevicesPanel({
                   onMouseEnter={(e) => { e.currentTarget.style.background = colors.bgCardAlt; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <td style={{ padding: '10px 14px' }}><StatusDot colors={colors} status={d.status} /></td>
-                  <td style={{ padding: '10px 14px', fontWeight: 600, color: colors.textPrimary }}>{d.name}</td>
-                  <td style={{ padding: '10px 14px', color: colors.textSecondary, fontFamily: 'monospace' }}>{d.ip}</td>
-                  <td style={{ padding: '10px 14px', color: colors.textSecondary }}>
+                  <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}><StatusDot colors={colors} status={d.status} /></td>
+                  <td style={{ padding: '10px 14px', fontWeight: 600, color: colors.textPrimary, whiteSpace: 'nowrap' }}>{d.name}</td>
+                  <td style={{ padding: '10px 14px', color: colors.textSecondary, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{d.ip}</td>
+                  <td style={{ padding: '10px 14px', color: colors.textTertiary, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{d.mac || '—'}</td>
+                  <td style={{ padding: '10px 14px', color: colors.textSecondary, whiteSpace: 'nowrap' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <Icon paths={typeMeta.icon} size={13} strokeWidth={2} color={colors.textTertiary} /> {typeMeta.label}
                     </span>
                   </td>
-                  <td style={{ padding: '10px 14px', color: colors.textSecondary }}>{d.location || '—'}</td>
-                  <td style={{ padding: '10px 14px', color: colors.textSecondary }}>{d.latencyMs != null ? `${d.latencyMs.toFixed(0)} ms` : '—'}</td>
-                  <td style={{ padding: '10px 14px', color: colors.textTertiary }}>{timeAgo(d.lastCheckAt)}</td>
+                  <td style={{ padding: '10px 14px', color: colors.textSecondary, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[d.vendor, d.model].filter(Boolean).join(' — ')}>
+                    {d.vendor || d.model ? [d.vendor, d.model].filter(Boolean).join(' — ') : '—'}
+                  </td>
+                  <td style={{ padding: '10px 14px', color: colors.textSecondary, whiteSpace: 'nowrap' }}>{d.location || '—'}</td>
+                  <td style={{ padding: '10px 14px', color: colors.textSecondary, whiteSpace: 'nowrap' }}>{d.latencyMs != null ? `${d.latencyMs.toFixed(0)} ms` : '—'}</td>
+                  <td style={{ padding: '10px 14px', color: colors.textTertiary, whiteSpace: 'nowrap' }}>{timeAgo(d.lastCheckAt)}</td>
                 </tr>
               );
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ padding: '24px 14px', textAlign: 'center', color: colors.textSecondary }}>
+                <td colSpan={9} style={{ padding: '24px 14px', textAlign: 'center', color: colors.textSecondary }}>
                   Nenhum dispositivo encontrado com esses filtros.
                 </td>
               </tr>

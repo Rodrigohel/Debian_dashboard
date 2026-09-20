@@ -3,6 +3,8 @@ import { pingHost } from './pingService.js';
 import { checkAnyTcpPort } from './tcpCheckService.js';
 import { listDevices } from './devicesService.js';
 import { getSettings } from './settingsService.js';
+import { readArpTable } from './macService.js';
+import { lookupVendor } from './ouiService.js';
 import {
   raiseDeviceOffline, resolveDeviceOffline, raiseDeviceDegraded, resolveDeviceDegraded,
 } from './alertsService.js';
@@ -22,6 +24,11 @@ const insertEventStmt = db.prepare(`
   INSERT INTO device_events (device_id, event_type, at) VALUES (?, ?, ?)
 `);
 const pruneChecksStmt = db.prepare(`DELETE FROM device_checks WHERE at < ?`);
+// Só preenche o fabricante quando ele ainda estiver vazio — se alguém
+// corrigiu manualmente (ex.: equipamento com chip de rede de um fabricante
+// mas vendido com marca própria, comum em produtos Intelbras/OEM), o
+// ciclo de monitoramento não deve sobrescrever de volta a cada rodada.
+const updateMacStmt = db.prepare(`UPDATE devices SET mac = @mac, vendor = @vendor WHERE id = @id`);
 
 // Roda um lote de tarefas assíncronas com no máximo `limit` em paralelo por
 // vez — evita disparar ~230 processos `ping` de uma vez só no sistema.
@@ -36,18 +43,29 @@ export async function runWithConcurrency(items, limit, worker) {
   await Promise.all(workers);
 }
 
-async function checkDevice(device, settings) {
+async function checkDevice(device, settings, arpTable) {
   const timeoutMs = settings.pingTimeoutMs;
   const ping = await pingHost(device.ip, timeoutMs);
   const now = new Date().toISOString();
 
   let status;
   let consecutiveFails = device.consecutiveFails || 0;
+  let mac = device.mac;
+  let vendor = device.vendor;
 
   if (ping.ok) {
     consecutiveFails = 0;
     const tcpOk = device.ports.length > 0 ? await checkAnyTcpPort(device.ip, device.ports, timeoutMs) : null;
     status = tcpOk === false ? 'degraded' : 'online';
+
+    // MAC é resolvido de graça: o próprio ping que acabou de rodar já
+    // populou a tabela ARP do kernel para esse IP.
+    const discoveredMac = arpTable.get(device.ip);
+    if (discoveredMac && discoveredMac !== device.mac) {
+      mac = discoveredMac;
+      vendor = device.vendor || lookupVendor(discoveredMac) || '';
+      updateMacStmt.run({ id: device.id, mac, vendor });
+    }
   } else {
     consecutiveFails += 1;
     status = consecutiveFails >= settings.offlineThresholdFails ? 'offline' : device.status;
@@ -85,7 +103,7 @@ async function checkDevice(device, settings) {
     }
   }
 
-  return { ...device, status, latencyMs: ping.latencyMs, lastCheckAt: now };
+  return { ...device, status, latencyMs: ping.latencyMs, lastCheckAt: now, mac, vendor };
 }
 
 export async function runMonitorCycle() {
@@ -95,11 +113,12 @@ export async function runMonitorCycle() {
     offlineThresholdFails: Number(settings.offlineThresholdFails),
   };
   const devices = listDevices().filter((d) => d.enabled);
+  const arpTable = await readArpTable();
 
   const results = [];
   await runWithConcurrency(devices, Number(settings.pingConcurrency) || 25, async (device) => {
     try {
-      results.push(await checkDevice(device, numericSettings));
+      results.push(await checkDevice(device, numericSettings, arpTable));
     } catch (err) {
       console.error(`[monitor] erro ao checar ${device.ip}:`, err.message);
     }
