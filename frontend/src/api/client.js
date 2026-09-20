@@ -56,6 +56,28 @@ export function resolveAssetUrl(path) {
   return `${API_URL}${path}`;
 }
 
+// Downloads autenticados (CSV/PDF): uma navegação direta (`window.open` /
+// `<a href>`) não carrega o header Authorization, então o backend
+// responderia 401 — busca o arquivo via fetch (com o token) como blob e
+// aciona o download programaticamente.
+async function downloadFile(path, filename) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Erro ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   login: (username, password) =>
     request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
@@ -90,12 +112,17 @@ export const api = {
     }
     return res.json();
   },
-  exportDevicesUrl: () => {
-    const token = getToken();
-    return `${API_URL}/api/devices/export${token ? `?_t=${Date.now()}` : ''}`;
-  },
+  exportDevicesCsv: () => downloadFile('/api/devices/export', 'dispositivos.csv'),
+  exportDevicesPdf: () => downloadFile('/api/devices/export/pdf', 'dispositivos.pdf'),
 
   alerts: () => request('/api/alerts'),
+  eventsHistory: (params = {}) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''));
+    return request(`/api/history?${qs}`);
+  },
+
+  networkHistory: (hours) => request(`/api/stats/network-history?hours=${hours}`),
+  serverHealth: () => request('/api/stats/server-health'),
 
   publicDashboard: () => request('/api/public/dashboard'),
   publicSettings: () => request('/api/public/settings'),

@@ -14,6 +14,8 @@ const DEFAULTS = {
   pingIntervalSeconds: String(config.monitor.pingIntervalSeconds),
   pingTimeoutMs: String(config.monitor.pingTimeoutMs),
   offlineThresholdFails: String(config.monitor.offlineThresholdFails),
+  networkBase: config.networkBase,
+  networkHistoryRetentionHours: String(process.env.NETWORK_HISTORY_RETENTION_HOURS || 168),
   alertReminderIntervalMinutes: String(process.env.ALERT_REMINDER_INTERVAL_MINUTES || 60),
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID || '',

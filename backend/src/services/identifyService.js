@@ -1,6 +1,7 @@
 import { db } from '../db/sqlite.js';
 import { readArpTable } from './macService.js';
 import { lookupVendor } from './ouiService.js';
+import { pingHost } from './pingService.js';
 import { fingerprintHttp } from './httpFingerprintService.js';
 import { ssdpProbe, onvifProbe } from './discoveryService.js';
 import { runWithConcurrency } from './monitorService.js';
@@ -19,8 +20,14 @@ const updateStmt = db.prepare(`
  * equipamento. Nenhuma dessas fontes é garantida — cada dispositivo real
  * responde a um subconjunto diferente delas.
  */
-export async function identifyDevice(device, { arpTable } = {}) {
-  const arp = arpTable || await readArpTable();
+export async function identifyDevice(device) {
+  // A tabela ARP só tem entrada para IPs que o kernel já tentou resolver —
+  // ou seja, que já foram pingados antes. Um dispositivo recém-importado
+  // (CSV/manual) que ainda não passou por nenhuma rodada do monitor não
+  // teria MAC nenhum sem isso: pinga agora mesmo, na hora do "Identificar",
+  // pra garantir uma entrada fresca antes de ler a tabela.
+  await pingHost(device.ip, 1200);
+  const arp = await readArpTable();
   const mac = arp.get(device.ip) || device.mac || null;
   const vendorFromMac = lookupVendor(mac);
 
@@ -60,7 +67,6 @@ export async function identifyDevice(device, { arpTable } = {}) {
  * de tarefas em paralelo do que o ping evita saturar a interface de rede.
  */
 export async function identifyDevices(deviceIds, concurrency = 15) {
-  const arpTable = await readArpTable();
   const devices = deviceIds
     ? deviceIds.map((id) => getDevice(id)).filter(Boolean)
     : listDevices().filter((d) => d.enabled);
@@ -68,7 +74,7 @@ export async function identifyDevices(deviceIds, concurrency = 15) {
   const results = [];
   await runWithConcurrency(devices, concurrency, async (device) => {
     try {
-      results.push(await identifyDevice(device, { arpTable }));
+      results.push(await identifyDevice(device));
     } catch (err) {
       console.error(`[identify] erro ao identificar ${device.ip}:`, err.message);
     }

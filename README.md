@@ -26,6 +26,29 @@ público opcional.
   processo só, uma porta só, sem precisar de Nginx/Apache.
 - **`install.sh`** — instalador automatizado de ponta a ponta.
 
+## Recursos do painel
+
+- **Dispositivos**: tabela com colunas clicáveis para ordenar (status, nome,
+  IP, MAC, tipo, fabricante, local, latência, última checagem), filtro por
+  status/tipo/fabricante e busca livre (nome, IP, MAC, local).
+- **Exportação**: CSV (para editar em planilha) e **PDF** (relatório pronto
+  para imprimir ou anexar, agrupado por tipo e fabricante) — botões "CSV" e
+  "PDF" na tela de Dispositivos.
+- **Histórico de queda/recuperação**: aba "Histórico" — cada evento mostra
+  quando caiu, quando voltou e **quanto tempo durou** o estado anterior,
+  filtrável por tipo de evento, período e dispositivo.
+- **Análise de rede**: gráfico "Saúde da rede ao longo do tempo" (online /
+  degradado / offline empilhados, 6h a 30 dias) com latência média do
+  período e tooltip ao passar o mouse.
+- **Saúde do servidor**: CPU, memória, disco e uptime da própria máquina que
+  roda o painel (aba "Servidor").
+- **Usuários**: crie/remova outros logins pela tela de Configurações → aba
+  "Usuários", cada um como Administrador (acesso total) ou Usuário comum
+  (vê o painel, mas não a tela de Configurações).
+- **Configurações**: tudo num só lugar — identidade (nome/logo), intervalo
+  e timeout do ping, limiar de falhas para marcar offline, prefixo de rede
+  do "Escanear rede", retenção do histórico, lembrete de alerta e Telegram.
+
 ## Instalação — um único comando
 
 ```bash
@@ -175,10 +198,17 @@ depende só do ping.
 - `POST /api/devices/scan` — varredura de ping na rede (já identifica os
   novos automaticamente).
 - `POST /api/devices/import` / `GET /api/devices/export` — CSV em massa.
+- `GET /api/devices/export/pdf` — relatório em PDF de todos os dispositivos.
 - `POST /api/devices/:id/check` — força uma verificação de ping imediata.
 - `POST /api/devices/:id/identify` / `POST /api/devices/identify-all` — MAC,
   fabricante e modelo (ONVIF/SSDP/HTTP).
 - `GET /api/alerts` — histórico de alertas ativos/resolvidos.
+- `GET /api/history` — eventos de queda/recuperação com duração calculada
+  (filtros: `deviceId`, `eventType`, `from`, `to`, `limit`).
+- `GET /api/stats/network-history?hours=N` — série da rede (online/offline/
+  degradado + latência média) para o gráfico de análise.
+- `GET /api/stats/server-health` — CPU, memória, disco e uptime do servidor.
+- `GET/POST/DELETE /api/users` — gestão de usuários do painel (admin).
 - `GET/PUT /api/settings`, `POST /api/settings/telegram/test` — configuração.
 - WebSocket em `/ws` — push do status de todos os dispositivos a cada rodada
   de monitoramento.

@@ -7,6 +7,8 @@ import {
 import { scanNetwork } from '../services/scanService.js';
 import { runMonitorCycle } from '../services/monitorService.js';
 import { identifyDevice, identifyDevices } from '../services/identifyService.js';
+import { getSettings } from '../services/settingsService.js';
+import { streamDevicesPdf } from '../services/pdfReportService.js';
 import { config } from '../config.js';
 import { parseCsv, toCsv } from '../utils/csv.js';
 
@@ -38,13 +40,27 @@ devicesRouter.get('/export', (req, res) => {
   res.send(csv);
 });
 
+devicesRouter.get('/export/pdf', (req, res) => {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="dispositivos.pdf"');
+  streamDevicesPdf(res);
+});
+
 // Roda MAC (via ARP) + fabricante (OUI) + best-effort marca/modelo (ONVIF,
 // SSDP/UPnP, interface web) em todos os dispositivos de uma vez — o botão
 // "Identificar tudo" depois de um "Escanear rede", que só descobre IPs.
 devicesRouter.post('/identify-all', requireAdmin, async (req, res) => {
   try {
     const results = await identifyDevices(Array.isArray(req.body?.ids) ? req.body.ids : null);
-    res.json({ identified: results.length });
+    res.json({
+      processed: results.length,
+      // Um dispositivo offline no momento não tem como ter o MAC lido (a
+      // tabela ARP só existe para quem responde) — não é falha do painel.
+      withMac: results.filter((d) => d.mac).length,
+      withVendor: results.filter((d) => d.vendor).length,
+      withModel: results.filter((d) => d.model).length,
+      offline: results.filter((d) => d.status === 'offline').length,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -118,7 +134,7 @@ devicesRouter.post('/import', requireAdmin, upload.single('file'), (req, res) =>
 });
 
 devicesRouter.post('/scan', requireAdmin, async (req, res) => {
-  const base = req.body?.base || config.networkBase;
+  const base = req.body?.base || getSettings().networkBase || config.networkBase;
   const start = Number(req.body?.start) || 1;
   const end = Number(req.body?.end) || 254;
   if (end - start > 512) {

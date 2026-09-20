@@ -88,6 +88,20 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT
   );
+
+  -- Uma linha por rodada de monitoramento, com a contagem geral da rede —
+  -- alimenta o gráfico de "saúde da rede ao longo do tempo". Podada
+  -- periodicamente (ver monitorService), então cresce de forma limitada.
+  CREATE TABLE IF NOT EXISTS network_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    total INTEGER NOT NULL,
+    online INTEGER NOT NULL,
+    offline INTEGER NOT NULL,
+    degraded INTEGER NOT NULL,
+    avg_latency_ms REAL
+  );
+  CREATE INDEX IF NOT EXISTS idx_network_history_at ON network_history(at DESC);
 `);
 
 // Migração leve: `CREATE TABLE IF NOT EXISTS` acima não adiciona colunas

@@ -11,6 +11,8 @@ import { alertsRouter } from './routes/alerts.js';
 import { publicRouter } from './routes/public.js';
 import { settingsRouter } from './routes/settings.js';
 import { usersRouter } from './routes/users.js';
+import { statsRouter } from './routes/stats.js';
+import { historyRouter } from './routes/history.js';
 import { requireAuth, requireAdmin } from './middleware/auth.js';
 import { startMonitorLoop } from './services/monitorService.js';
 import { listDevices } from './services/devicesService.js';
@@ -34,6 +36,8 @@ app.use('/api/settings', requireAuth, requireAdmin, settingsRouter);
 app.use('/api/users', requireAuth, requireAdmin, usersRouter);
 app.use('/api/devices', requireAuth, devicesRouter);
 app.use('/api/alerts', requireAuth, alertsRouter);
+app.use('/api/stats', requireAuth, statsRouter);
+app.use('/api/history', requireAuth, historyRouter);
 
 // Serve o próprio frontend buildado (frontend/dist, pasta irmã de backend/),
 // quando presente — assim um único processo Node atende tudo (API, WS e a

@@ -12,6 +12,9 @@ import AddDeviceModal from '../components/AddDeviceModal.jsx';
 import AlertsPanel from '../components/AlertsPanel.jsx';
 import SettingsModal from '../components/SettingsModal.jsx';
 import LoadingScreen from '../components/LoadingScreen.jsx';
+import NetworkHistoryChart from '../components/NetworkHistoryChart.jsx';
+import ServerHealthPanel from '../components/ServerHealthPanel.jsx';
+import HistoryPanel from '../components/HistoryPanel.jsx';
 
 const THEME_KEY = 'ip_dashboard_theme';
 const POLL_MS = 15000;
@@ -49,6 +52,9 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
   const topRef = useRef(null);
   const devicesSectionRef = useRef(null);
   const alertsSectionRef = useRef(null);
+  const chartSectionRef = useRef(null);
+  const historySectionRef = useRef(null);
+  const serverSectionRef = useRef(null);
 
   const colors = getColors(theme);
   const isDark = theme === 'dark';
@@ -141,7 +147,8 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     try {
       const result = await api.identifyAll();
       await loadAll();
-      alert(`Identificação concluída: ${result.identified} dispositivo(s) verificado(s) (MAC, fabricante e modelo, quando encontrados).`);
+      const offlineNote = result.offline > 0 ? `\n${result.offline} estavam offline no momento — MAC só é possível para quem responde à rede.` : '';
+      alert(`Identificação concluída: ${result.processed} verificados — ${result.withMac} com MAC, ${result.withVendor} com fabricante, ${result.withModel} com modelo.${offlineNote}`);
     } catch (err) {
       alert(`Erro ao identificar: ${err.message}`);
     } finally {
@@ -181,8 +188,20 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
     }
   }
 
-  function handleExport() {
-    window.open(api.exportDevicesUrl(), '_blank');
+  async function handleExportCsv() {
+    try {
+      await api.exportDevicesCsv();
+    } catch (err) {
+      alert(`Erro ao exportar CSV: ${err.message}`);
+    }
+  }
+
+  async function handleExportPdf() {
+    try {
+      await api.exportDevicesPdf();
+    } catch (err) {
+      alert(`Erro ao exportar PDF: ${err.message}`);
+    }
   }
 
   if (!devices) {
@@ -212,7 +231,10 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
   const navItems = [
     { key: 'overview', label: 'Visão geral', icon: ICONS.network, onClick: () => topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
     { key: 'devices', label: 'Dispositivos', icon: ICONS.server, onClick: () => scrollToSection(devicesSectionRef) },
+    { key: 'chart', label: 'Análise de rede', icon: ICONS.clock, onClick: () => scrollToSection(chartSectionRef) },
     { key: 'alerts', label: 'Alertas', icon: ICONS.warningTriangle, onClick: () => scrollToSection(alertsSectionRef) },
+    { key: 'history', label: 'Histórico', icon: ICONS.clock, onClick: () => scrollToSection(historySectionRef) },
+    { key: 'server', label: 'Servidor', icon: ICONS.server, onClick: () => scrollToSection(serverSectionRef) },
   ];
 
   return (
@@ -228,7 +250,7 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
         onToggleTheme={() => setTheme(isDark ? 'light' : 'dark')}
         user={user}
         onLogout={onLogout}
-        onOpenSettings={() => { setShowSettings(true); setSidebarOpen(false); }}
+        onOpenSettings={user?.role === 'admin' ? () => { setShowSettings(true); setSidebarOpen(false); } : undefined}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
@@ -290,7 +312,8 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
             onAddDevice={() => setShowAddModal(true)}
             onScan={handleScan}
             onImport={handleImport}
-            onExport={handleExport}
+            onExportCsv={handleExportCsv}
+            onExportPdf={handleExportPdf}
             onIdentifyAll={handleIdentifyAll}
             scanning={scanning}
             importing={importing}
@@ -298,8 +321,21 @@ export default function Dashboard({ user, onLogout, settings, reloadSettings }) 
           />
         </div>
 
-        <div ref={alertsSectionRef} style={{ ...reveal(2), scrollMarginTop: 20 }}>
-          <AlertsPanel colors={colors} alerts={alerts} />
+        <div ref={chartSectionRef} style={{ ...reveal(2), scrollMarginTop: 20 }}>
+          <NetworkHistoryChart colors={colors} />
+        </div>
+
+        <div style={{ ...reveal(3), display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(380px,100%),1fr))', gap: 16, alignItems: 'start' }}>
+          <div ref={alertsSectionRef} style={{ scrollMarginTop: 20 }}>
+            <AlertsPanel colors={colors} alerts={alerts} />
+          </div>
+          <div ref={serverSectionRef} style={{ scrollMarginTop: 20 }}>
+            <ServerHealthPanel colors={colors} />
+          </div>
+        </div>
+
+        <div ref={historySectionRef} style={{ ...reveal(4), scrollMarginTop: 20 }}>
+          <HistoryPanel colors={colors} />
         </div>
 
       </div>

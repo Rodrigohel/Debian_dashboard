@@ -5,6 +5,7 @@ import { listDevices } from './devicesService.js';
 import { getSettings } from './settingsService.js';
 import { readArpTable } from './macService.js';
 import { lookupVendor } from './ouiService.js';
+import { recordNetworkSnapshot, pruneNetworkHistory } from './networkHistoryService.js';
 import {
   raiseDeviceOffline, resolveDeviceOffline, raiseDeviceDegraded, resolveDeviceDegraded,
 } from './alertsService.js';
@@ -127,6 +128,9 @@ export async function runMonitorCycle() {
   const retentionHours = Number(settings.checksRetentionHours) || 6;
   const cutoff = new Date(Date.now() - retentionHours * 3600 * 1000).toISOString();
   pruneChecksStmt.run(cutoff);
+
+  recordNetworkSnapshot(results);
+  pruneNetworkHistory(Number(settings.networkHistoryRetentionHours) || 168);
 
   return results;
 }

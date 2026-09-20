@@ -8,6 +8,34 @@ const STATUS_META = {
   unknown: { label: 'Verificando...', color: 'gray' },
 };
 
+const COLUMNS = [
+  { key: 'status', label: 'Status' },
+  { key: 'name', label: 'Nome' },
+  { key: 'ip', label: 'IP' },
+  { key: 'mac', label: 'MAC' },
+  { key: 'type', label: 'Tipo' },
+  { key: 'vendor', label: 'Fabricante / Modelo' },
+  { key: 'location', label: 'Local' },
+  { key: 'latencyMs', label: 'Latência' },
+  { key: 'lastCheckAt', label: 'Última checagem' },
+];
+
+function ipToNumber(ip) {
+  const parts = ip.split('.').map(Number);
+  return parts.reduce((acc, p) => acc * 256 + (Number.isFinite(p) ? p : 0), 0);
+}
+
+function sortValue(device, key) {
+  switch (key) {
+    case 'ip': return ipToNumber(device.ip);
+    case 'latencyMs': return device.latencyMs ?? -1;
+    case 'lastCheckAt': return device.lastCheckAt ? new Date(device.lastCheckAt).getTime() : 0;
+    case 'type': return (TYPE_META[device.type]?.label || device.type).toLowerCase();
+    case 'vendor': return (device.vendor || '￿').toLowerCase();
+    default: return (device[key] || '').toString().toLowerCase();
+  }
+}
+
 function timeAgo(iso) {
   if (!iso) return '—';
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -71,12 +99,14 @@ function FilterChip({ colors, active, onClick, label, count, color }) {
 }
 
 export default function DevicesPanel({
-  colors, devices, onSelectDevice, onAddDevice, onScan, onImport, onExport, onIdentifyAll,
+  colors, devices, onSelectDevice, onAddDevice, onScan, onImport, onExportCsv, onExportPdf, onIdentifyAll,
   scanning, importing, identifying,
 }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState(null);
+  const [vendorFilter, setVendorFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState({ key: 'type', dir: 1 });
   const fileInputRef = useRef(null);
 
   const counts = useMemo(() => {
@@ -89,21 +119,39 @@ export default function DevicesPanel({
     return { status: c, byType };
   }, [devices]);
 
+  const vendors = useMemo(() => {
+    const set = new Set(devices.map((d) => d.vendor).filter(Boolean));
+    return [...set].sort();
+  }, [devices]);
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return devices.filter((d) => {
+    const list = devices.filter((d) => {
       if (statusFilter !== 'all' && d.status !== statusFilter) return false;
       if (typeFilter && d.type !== typeFilter) return false;
-      if (needle && !(d.name.toLowerCase().includes(needle) || d.ip.includes(needle) || d.location.toLowerCase().includes(needle))) return false;
+      if (vendorFilter && d.vendor !== vendorFilter) return false;
+      if (needle && !(d.name.toLowerCase().includes(needle) || d.ip.includes(needle) || d.location.toLowerCase().includes(needle) || (d.mac || '').includes(needle))) return false;
       return true;
     });
-  }, [devices, statusFilter, typeFilter, search]);
+    const sorted = [...list].sort((a, b) => {
+      const va = sortValue(a, sort.key);
+      const vb = sortValue(b, sort.key);
+      if (va < vb) return -1 * sort.dir;
+      if (va > vb) return 1 * sort.dir;
+      return 0;
+    });
+    return sorted;
+  }, [devices, statusFilter, typeFilter, vendorFilter, search, sort]);
+
+  function toggleSort(key) {
+    setSort((current) => (current.key === key ? { key, dir: -current.dir } : { key, dir: 1 }));
+  }
 
   return (
     <div style={{ background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '20px 22px', boxShadow: colors.shadow }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
         <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: 16, fontWeight: 600, color: colors.textPrimary }}>
-          Dispositivos ({devices.length})
+          Dispositivos ({filtered.length}{filtered.length !== devices.length ? ` de ${devices.length}` : ''})
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <ToolbarButton colors={colors} primary onClick={onAddDevice}>
@@ -122,8 +170,11 @@ export default function DevicesPanel({
             style={{ display: 'none' }}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ''; }}
           />
-          <ToolbarButton colors={colors} onClick={onExport}>
-            <Icon paths={ICONS.download} size={14} strokeWidth={2.2} /> Exportar CSV
+          <ToolbarButton colors={colors} onClick={onExportCsv}>
+            <Icon paths={ICONS.download} size={14} strokeWidth={2.2} /> CSV
+          </ToolbarButton>
+          <ToolbarButton colors={colors} onClick={onExportPdf}>
+            <Icon paths={ICONS.download} size={14} strokeWidth={2.2} /> PDF
           </ToolbarButton>
           <ToolbarButton colors={colors} onClick={onIdentifyAll} disabled={identifying}>
             <Icon paths={ICONS.search} size={14} strokeWidth={2.2} /> {identifying ? 'Identificando...' : 'Identificar tudo'}
@@ -145,6 +196,18 @@ export default function DevicesPanel({
             <FilterChip key={type} colors={colors} active={typeFilter === type} onClick={() => setTypeFilter(type)} label={TYPE_META[type]?.label || type} count={count} color={colors.primary} />
           ))}
         </div>
+
+        {vendors.length > 0 && (
+          <select
+            value={vendorFilter}
+            onChange={(e) => setVendorFilter(e.target.value)}
+            style={{ padding: '7px 10px', borderRadius: 10, border: `1px solid ${colors.border}`, fontSize: 12.5, color: colors.textPrimary, background: colors.bgCard }}
+          >
+            <option value="">Todos os fabricantes</option>
+            {vendors.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        )}
+
         <div style={{ position: 'relative', marginLeft: 'auto', minWidth: 220 }}>
           <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: colors.textTertiary }}>
             <Icon paths={ICONS.search} size={14} strokeWidth={2.2} />
@@ -152,7 +215,7 @@ export default function DevicesPanel({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nome, IP ou local..."
+            placeholder="Buscar por nome, IP, MAC ou local..."
             style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: 10, border: `1px solid ${colors.border}`, fontSize: 13 }}
           />
         </div>
@@ -162,9 +225,13 @@ export default function DevicesPanel({
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ position: 'sticky', top: 0, background: colors.bgCardAlt, zIndex: 1 }}>
-              {['Status', 'Nome', 'IP', 'MAC', 'Tipo', 'Fabricante / Modelo', 'Local', 'Latência', 'Última checagem'].map((h) => (
-                <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: colors.textTertiary, borderBottom: `1px solid ${colors.border}`, whiteSpace: 'nowrap' }}>
-                  {h}
+              {COLUMNS.map((col) => (
+                <th
+                  key={col.key}
+                  onClick={() => toggleSort(col.key)}
+                  style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: sort.key === col.key ? colors.primary : colors.textTertiary, borderBottom: `1px solid ${colors.border}`, whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}
+                >
+                  {col.label} {sort.key === col.key && (sort.dir === 1 ? '▲' : '▼')}
                 </th>
               ))}
             </tr>
@@ -200,7 +267,7 @@ export default function DevicesPanel({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ padding: '24px 14px', textAlign: 'center', color: colors.textSecondary }}>
+                <td colSpan={COLUMNS.length} style={{ padding: '24px 14px', textAlign: 'center', color: colors.textSecondary }}>
                   Nenhum dispositivo encontrado com esses filtros.
                 </td>
               </tr>

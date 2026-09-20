@@ -37,7 +37,7 @@ settingsRouter.get('/', (req, res) => {
 settingsRouter.put('/', (req, res) => {
   const {
     companyName, siteName, pingIntervalSeconds, pingTimeoutMs, offlineThresholdFails, alertReminderIntervalMinutes,
-    telegramBotToken, telegramChatId,
+    networkBase, networkHistoryRetentionHours, telegramBotToken, telegramChatId,
   } = req.body || {};
   const updates = {};
 
@@ -66,6 +66,20 @@ settingsRouter.put('/', (req, res) => {
     const n = Number(alertReminderIntervalMinutes);
     if (!Number.isFinite(n) || n < 0) return res.status(400).json({ error: 'Intervalo de lembrete deve ser um número de minutos (0 desativa).' });
     updates.alertReminderIntervalMinutes = n;
+  }
+
+  if (networkBase !== undefined) {
+    const value = String(networkBase).trim();
+    if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value)) {
+      return res.status(400).json({ error: 'Prefixo de rede inválido — use o formato 192.168.1 (3 primeiros números do IP).' });
+    }
+    updates.networkBase = value;
+  }
+
+  if (networkHistoryRetentionHours !== undefined) {
+    const n = Number(networkHistoryRetentionHours);
+    if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: 'Retenção do histórico deve ser de pelo menos 1 hora.' });
+    updates.networkHistoryRetentionHours = n;
   }
 
   if (typeof telegramBotToken === 'string') updates.telegramBotToken = telegramBotToken.trim();
