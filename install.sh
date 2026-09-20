@@ -70,6 +70,16 @@ primary_ip() {
   if command -v hostname >/dev/null 2>&1; then hostname -I 2>/dev/null | awk '{print $1}'; fi
 }
 
+# O chown mais abaixo entrega a pasta pro usuário de serviço — sem isso, o
+# Git recusa (por segurança) qualquer operação feita como root numa pasta
+# pertencente a outro usuário ("detected dubious ownership"), e um
+# `git pull` de atualização rodado depois falharia calado, deixando o
+# instalador de uma próxima vez rodar em cima do código antigo sem avisar
+# ninguém. Registra as duas pastas possíveis (script pode já estar sendo
+# rodado de dentro de $INSTALL_DIR, ou de um clone temporário).
+git config --global --add safe.directory "$SCRIPT_DIR" 2>/dev/null || true
+git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
+
 log "Dashboard de Monitoramento de Rede — instalação"
 info "Diretório de instalação: $INSTALL_DIR"
 
@@ -195,6 +205,10 @@ npm run build --silent
 info "Build gerado em frontend/dist — o backend serve esses arquivos direto, sem precisar de Nginx/Apache."
 
 chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
+# .git fica com o dono original (quem clonou, normalmente root) — o serviço
+# nunca precisa escrever ali, e mantém `git pull`/`git log` como root
+# funcionando sem depender só da exceção safe.directory acima.
+[ -d "$INSTALL_DIR/.git" ] && chown -R root:root "$INSTALL_DIR/.git"
 
 # ------------------------------------------------------- 6. systemd ------
 log "6/7 — Registrando o serviço systemd"
