@@ -8,7 +8,10 @@
 #
 # Idempotente: pode rodar de novo (ex.: depois de um `git pull`) para
 # atualizar dependências e reiniciar o serviço, sem perder dados já
-# cadastrados nem resetar a senha do admin.
+# cadastrados nem resetar a senha do admin. Mas para uma atualização normal
+# (já instalado, só quer a versão nova), use ./update.sh — bem mais rápido,
+# porque pula toda a parte de instalação de sistema que não muda depois da
+# primeira vez.
 #
 # Todas as opções abaixo também podem ser passadas como variáveis de
 # ambiente para instalação 100% não-interativa, ex.:
@@ -279,7 +282,7 @@ echo
 echo "  Comandos úteis:"
 echo "    journalctl -u ip-dashboard-backend -f   # acompanhar logs"
 echo "    systemctl restart ip-dashboard-backend  # reiniciar"
-echo "    sudo ./install.sh                       # rodar de novo após um git pull (atualiza sem perder dados)"
+echo "    sudo ./update.sh                        # atualizar depois disso (mais rápido que rodar o install de novo)"
 echo
 if [ "$FIRST_INSTALL" -eq 1 ]; then
   warn "Guarde o backend/.env gerado (tem o JWT_SECRET) — não é enviado ao git."

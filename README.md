@@ -139,9 +139,28 @@ já habilitado para iniciar sozinho no boot. No fim ele imprime o endereço
 para acessar e, se você não informou usuário/senha, o login gerado
 automaticamente (**anote na hora**, só aparece uma vez).
 
-É **idempotente**: depois de um `git pull`, rodar `sudo ./install.sh` de
-novo atualiza tudo sem apagar dispositivos cadastrados nem resetar a senha
-do admin.
+É **idempotente**: rodar `sudo ./install.sh` de novo atualiza tudo sem
+apagar dispositivos cadastrados nem resetar a senha do admin — mas ele
+sempre refaz a parte de instalação completa (checagem do Node, usuário de
+sistema, unidade systemd), o que é mais lento e verboso do que precisa ser
+só para pegar uma atualização.
+
+### Atualizando depois do primeiro install
+
+Para isso existe o `update.sh` — mais rápido, só faz o que uma atualização
+de verdade precisa (baixar o código novo, reinstalar dependências que
+mudaram, rebuildar o frontend, reiniciar o serviço):
+
+```bash
+cd /opt/ip-dashboard
+sudo ./update.sh
+```
+
+Ele já vem no repositório, então funciona a partir do primeiro
+`git clone` — não precisa rodar `install.sh` de novo nem depois de um
+`update.sh`, um substitui o outro para esse fim. Só volte a usar
+`install.sh` se precisar reconfigurar algo do sistema (trocar a porta,
+reinstalar o serviço systemd, etc.).
 
 Tudo pode ser pré-definido por variável de ambiente para instalação 100%
 não-interativa (útil em automação):
