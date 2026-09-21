@@ -24,7 +24,9 @@ export function setToken(token) {
 }
 
 async function request(path, options = {}) {
-  const token = getToken();
+  // Embutido no Portal (mesma origem): reusa o token de sessão do Portal em
+  // vez de exigir login de novo — ver VITE_EMBEDDED no README/build-embed.sh.
+  const token = import.meta.env.VITE_EMBEDDED === 'true' ? localStorage.getItem('portal_token') : getToken();
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {

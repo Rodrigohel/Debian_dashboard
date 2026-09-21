@@ -404,3 +404,39 @@ configurado para outra coisa (como o painel do PBX). Modelos prontos em
 nesse caso, rebuilde o frontend com `VITE_BASE_PATH=/ip-dashboard/` e
 `VITE_API_URL`/`VITE_WS_URL` apontando para esse subcaminho antes do
 `npm run build` (ver comentários em `frontend/.env.example`).
+
+### Embutir num Portal via iframe (opcional)
+
+Além do build normal (`frontend/dist`, servido pelo próprio backend) e do
+build atrás de Nginx/Apache acima, existe um terceiro modo: rodar este
+painel embutido dentro de outro sistema ("Portal") via `<iframe>`, na
+mesma origem/domínio, reaproveitando o login já feito no Portal em vez de
+pedir senha de novo.
+
+Use `./build-embed.sh` (raiz do repo) em vez de `npm run build` — ele gera
+a saída em `frontend/dist-embed`, sem tocar em `frontend/dist`:
+
+```bash
+./build-embed.sh                          # base padrão: /apps/rede/
+BASE_PATH=/outro/caminho/ ./build-embed.sh # outro caminho no Portal
+```
+
+Esse build usa duas variáveis de ambiente novas, além do
+`VITE_BASE_PATH` já visto acima:
+
+- `VITE_API_URL`: aponta as chamadas de API do painel para o proxy
+  autenticado do Portal (ex.: `/gateway/rede`) em vez da própria origem.
+- `VITE_EMBEDDED=true`: faz o painel reusar o token de sessão do Portal
+  (lido de `localStorage.getItem('portal_token')`) em vez de exigir login
+  próprio — só funciona porque o iframe está na mesma origem do Portal,
+  então ambos compartilham o mesmo `localStorage`.
+
+Um build normal (sem essas variáveis) não é afetado: o código do modo
+embutido fica atrás de `import.meta.env.VITE_EMBEDDED`, então o Vite
+remove esse trecho do bundle standalone.
+
+Limitação conhecida: as atualizações em tempo real via WebSocket podem
+não funcionar embutido, caso o proxy do Portal só cubra requisições HTTP
+comuns — o painel continua funcionando normalmente nesse caso, só cai
+para o polling periódico (a cada alguns segundos) em vez de atualizar
+instantaneamente.

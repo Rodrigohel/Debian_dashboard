@@ -6,7 +6,7 @@ export function useAuth() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (!getToken()) {
+    if (import.meta.env.VITE_EMBEDDED !== 'true' && !getToken()) {
       setChecking(false);
       return;
     }
