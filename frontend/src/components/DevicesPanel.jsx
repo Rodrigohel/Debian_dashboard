@@ -12,8 +12,7 @@ const COLUMNS = [
   { key: 'favorite', label: '' },
   { key: 'status', label: 'Status' },
   { key: 'name', label: 'Nome' },
-  { key: 'ip', label: 'IP' },
-  { key: 'mac', label: 'MAC' },
+  { key: 'ip', label: 'IP / MAC' },
   { key: 'type', label: 'Tipo' },
   { key: 'vendor', label: 'Fabricante / Modelo' },
   { key: 'location', label: 'Local' },
@@ -269,8 +268,10 @@ export default function DevicesPanel({
                   </td>
                   <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}><StatusDot colors={colors} status={d.status} maintenanceUntil={d.maintenanceUntil} /></td>
                   <td style={{ padding: '10px 14px', fontWeight: 600, color: colors.textPrimary, whiteSpace: 'nowrap' }}>{d.name}</td>
-                  <td style={{ padding: '10px 14px', color: colors.textSecondary, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{d.ip}</td>
-                  <td style={{ padding: '10px 14px', color: colors.textTertiary, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>{d.mac || '—'}</td>
+                  <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                    <div style={{ color: colors.textSecondary, fontFamily: 'monospace' }}>{d.ip}</div>
+                    <div style={{ color: colors.textTertiary, fontFamily: 'monospace', fontSize: 11, marginTop: 2 }}>{d.mac || '—'}</div>
+                  </td>
                   <td style={{ padding: '10px 14px', color: colors.textSecondary, whiteSpace: 'nowrap' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <Icon paths={typeMeta.icon} size={13} strokeWidth={2} color={colors.textTertiary} /> {typeMeta.label}
