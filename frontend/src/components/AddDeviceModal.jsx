@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { TYPE_META } from './Icon.jsx';
 
 export default function AddDeviceModal({ colors, onClose, onCreate }) {
-  const [form, setForm] = useState({ ip: '', name: '', type: 'outro', location: '', ports: '', notes: '', username: '', password: '' });
+  const [form, setForm] = useState({ ip: '', name: '', type: 'outro', typeLabel: '', location: '', ports: '', notes: '', username: '', password: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -48,6 +48,12 @@ export default function AddDeviceModal({ colors, onClose, onCreate }) {
               <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex.: Bloco A" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
             </div>
           </div>
+          {form.type === 'outro' && (
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Descreva o tipo</label>
+              <input value={form.typeLabel} onChange={(e) => setForm({ ...form, typeLabel: e.target.value })} placeholder="Ex.: Sensor de porta" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
+            </div>
+          )}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Portas TCP (opcional, separadas por vírgula)</label>
             <input value={form.ports} onChange={(e) => setForm({ ...form, ports: e.target.value })} placeholder="ex.: 80, 554" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />

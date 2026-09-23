@@ -141,6 +141,7 @@ for (const [column, ddl] of [
   ['floor_x', 'ALTER TABLE devices ADD COLUMN floor_x REAL'],
   ['floor_y', 'ALTER TABLE devices ADD COLUMN floor_y REAL'],
   ['floor_id', 'ALTER TABLE devices ADD COLUMN floor_id INTEGER REFERENCES floors(id)'],
+  ['type_label', "ALTER TABLE devices ADD COLUMN type_label TEXT NOT NULL DEFAULT ''"],
 ]) {
   if (!deviceColumns.includes(column)) db.exec(ddl);
 }

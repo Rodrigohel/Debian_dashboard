@@ -119,7 +119,7 @@ export default function DeviceDetailModal({
   colors, device, onClose, onSave, onDelete, onCheckNow, onIdentifyNow, onToggleFavorite, onSetMaintenance, checking, identifying,
 }) {
   const [form, setForm] = useState({
-    name: device.name, type: device.type, location: device.location,
+    name: device.name, type: device.type, typeLabel: device.typeLabel || '', location: device.location,
     ports: device.ports.join(', '), notes: device.notes, enabled: device.enabled,
     mac: device.mac || '', vendor: device.vendor || '', model: device.model || '',
     username: device.username || '', password: device.password || '',
@@ -348,6 +348,12 @@ export default function DeviceDetailModal({
               {Object.entries(TYPE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
             </select>
           </div>
+          {form.type === 'outro' && (
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Descreva o tipo</label>
+              <input value={form.typeLabel} onChange={(e) => setForm({ ...form, typeLabel: e.target.value })} placeholder="Ex.: Sensor de porta" style={{ width: '100%', padding: '8px 10px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13 }} />
+            </div>
+          )}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Local</label>
             <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} style={{ width: '100%', padding: '8px 10px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13 }} />

@@ -5,11 +5,11 @@ import { getDeviceUptime } from './eventsService.js';
 export const DEVICE_TYPES = ['nvr', 'camera', 'porteiro', 'interfone', 'switch', 'ap', 'servidor', 'outro'];
 
 const insertStmt = db.prepare(`
-  INSERT INTO devices (ip, name, type, location, ports, notes, enabled, mac, vendor, model, device_username, device_password_enc)
-  VALUES (@ip, @name, @type, @location, @ports, @notes, @enabled, @mac, @vendor, @model, @deviceUsername, @devicePasswordEnc)
+  INSERT INTO devices (ip, name, type, type_label, location, ports, notes, enabled, mac, vendor, model, device_username, device_password_enc)
+  VALUES (@ip, @name, @type, @typeLabel, @location, @ports, @notes, @enabled, @mac, @vendor, @model, @deviceUsername, @devicePasswordEnc)
 `);
 const updateStmt = db.prepare(`
-  UPDATE devices SET ip=@ip, name=@name, type=@type, location=@location, ports=@ports, notes=@notes,
+  UPDATE devices SET ip=@ip, name=@name, type=@type, type_label=@typeLabel, location=@location, ports=@ports, notes=@notes,
          enabled=@enabled, mac=@mac, vendor=@vendor, model=@model,
          device_username=@deviceUsername, device_password_enc=@devicePasswordEnc
   WHERE id=@id
@@ -61,6 +61,7 @@ function rowToDevice(row) {
     ip: row.ip,
     name: row.name,
     type: row.type,
+    typeLabel: row.type_label || '',
     location: row.location,
     ports: JSON.parse(row.ports || '[]'),
     notes: row.notes,
@@ -119,6 +120,7 @@ export function createDevice(input) {
     ip,
     name,
     type: DEVICE_TYPES.includes(input.type) ? input.type : 'outro',
+    typeLabel: String(input.typeLabel || '').trim(),
     location: String(input.location || '').trim(),
     ports: normalizePorts(input.ports),
     notes: String(input.notes || '').trim(),
@@ -145,6 +147,7 @@ export function updateDevice(id, input) {
     ip,
     name: String(input.name ?? existing.name).trim() || ip,
     type: DEVICE_TYPES.includes(input.type) ? input.type : existing.type,
+    typeLabel: input.typeLabel !== undefined ? String(input.typeLabel).trim() : existing.type_label,
     location: input.location !== undefined ? String(input.location).trim() : existing.location,
     ports: input.ports !== undefined ? normalizePorts(input.ports) : existing.ports,
     notes: input.notes !== undefined ? String(input.notes).trim() : existing.notes,

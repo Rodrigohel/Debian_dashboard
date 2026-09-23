@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import Icon, { ICONS, TYPE_META } from './Icon.jsx';
+import Icon, { ICONS, TYPE_META, deviceTypeLabel } from './Icon.jsx';
 
 const STATUS_META = {
   online: { label: 'Online', color: 'green' },
@@ -274,7 +274,7 @@ export default function DevicesPanel({
                   </td>
                   <td style={{ padding: '10px 14px', color: colors.textSecondary, whiteSpace: 'nowrap' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                      <Icon paths={typeMeta.icon} size={13} strokeWidth={2} color={colors.textTertiary} /> {typeMeta.label}
+                      <Icon paths={typeMeta.icon} size={13} strokeWidth={2} color={colors.textTertiary} /> {deviceTypeLabel(d)}
                     </span>
                   </td>
                   <td style={{ padding: '10px 14px', color: colors.textSecondary, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[d.vendor, d.model].filter(Boolean).join(' — ')}>

@@ -75,3 +75,10 @@ export const TYPE_META = {
   servidor: { label: 'Servidor', icon: ICONS.server },
   outro: { label: 'Outro', icon: ICONS.helpCircle },
 };
+
+// Quando o tipo é "outro", o usuário pode descrever o que é (device.typeLabel)
+// — aqui é onde isso aparece em vez do genérico "Outro".
+export function deviceTypeLabel(device) {
+  if (device.type === 'outro' && device.typeLabel) return device.typeLabel;
+  return (TYPE_META[device.type] || TYPE_META.outro).label;
+}
