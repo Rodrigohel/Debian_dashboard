@@ -33,6 +33,17 @@ app.use(helmet({
   // de voltar a acessar por HTTP. Quem colocar atrás de um Nginx/Apache com
   // TLS de verdade (ver README) pode ligar HSTS manualmente nesse proxy.
   hsts: false,
+  // upgradeInsecureRequests (ligado por padrão no CSP) manda o navegador
+  // tentar buscar TUDO em HTTPS, mesmo a própria página tendo sido acessada
+  // por HTTP puro — nessa porta só existe HTTP, então isso faz o navegador
+  // tentar https://IP:3002/assets/*.js, a conexão TLS falha (a porta não
+  // fala TLS) e a página fica em branco, sem carregar nada. Mesmo motivo do
+  // HSTS acima: sem isso desligado, o painel não funciona no modo de uso
+  // normal dele (LAN/Tailscale, sem certificado).
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: { upgradeInsecureRequests: null },
+  },
 }));
 app.use(cors({ origin: config.corsOrigin }));
 app.use(express.json());
