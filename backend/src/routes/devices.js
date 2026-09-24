@@ -13,6 +13,7 @@ import { getSettings } from '../services/settingsService.js';
 import { streamDevicesPdf } from '../services/pdfReportService.js';
 import { config } from '../config.js';
 import { parseCsv, toCsv } from '../utils/csv.js';
+import { logAudit } from '../services/auditService.js';
 
 export const devicesRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
@@ -76,7 +77,9 @@ devicesRouter.get('/:id', (req, res) => {
 
 devicesRouter.post('/', requireAdmin, (req, res) => {
   try {
-    res.status(201).json(createDevice(req.body || {}));
+    const device = createDevice(req.body || {});
+    logAudit({ username: req.user?.username, action: 'device.create', details: `Dispositivo "${device.name}" (${device.ip}) criado` });
+    res.status(201).json(device);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -84,14 +87,18 @@ devicesRouter.post('/', requireAdmin, (req, res) => {
 
 devicesRouter.put('/:id', requireAdmin, (req, res) => {
   try {
-    res.json(updateDevice(Number(req.params.id), req.body || {}));
+    const device = updateDevice(Number(req.params.id), req.body || {});
+    logAudit({ username: req.user?.username, action: 'device.update', details: `Dispositivo "${device.name}" (${device.ip}) atualizado` });
+    res.json(device);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
 devicesRouter.delete('/:id', requireAdmin, (req, res) => {
+  const device = getDevice(Number(req.params.id));
   deleteDevice(Number(req.params.id));
+  if (device) logAudit({ username: req.user?.username, action: 'device.delete', details: `Dispositivo "${device.name}" (${device.ip}) removido` });
   res.status(204).end();
 });
 
@@ -116,7 +123,15 @@ devicesRouter.post('/:id/maintenance', requireAdmin, (req, res) => {
   if (until && Number.isNaN(new Date(until).getTime())) {
     return res.status(400).json({ error: 'Data inválida.' });
   }
-  res.json(setMaintenance(device.id, until));
+  const updated = setMaintenance(device.id, until);
+  logAudit({
+    username: req.user?.username,
+    action: 'device.maintenance',
+    details: until
+      ? `"${device.name}" colocado em manutenção até ${new Date(until).toLocaleString('pt-BR')}`
+      : `Manutenção encerrada para "${device.name}"`,
+  });
+  res.json(updated);
 });
 
 // `floorId`/`x`/`y` todos null remove o dispositivo de qualquer planta
@@ -171,6 +186,7 @@ devicesRouter.post('/import', requireAdmin, upload.single('file'), (req, res) =>
       errors.push({ ip: row.ip, error: err.message });
     }
   }
+  logAudit({ username: req.user?.username, action: 'device.import', details: `Importação CSV: ${processed} processados, ${errors.length} erros` });
   res.json({ processed, errors });
 });
 

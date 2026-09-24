@@ -6,6 +6,26 @@ import { config } from '../config.js';
 const dir = path.dirname(config.auth.sqlitePath);
 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
+// Aplica uma restauração de backup pendente (ver backupService.scheduleRestore)
+// ANTES de abrir a conexão real — trocar o arquivo do banco com a conexão já
+// aberta (e dezenas de prepared statements de outros módulos apontando pra
+// ela) não é seguro. O fluxo é: a rota de restore grava o banco escolhido em
+// restore-pending.db e força o processo a reiniciar (systemd Restart=on-failure
+// sobe de novo); aqui, no boot seguinte, é quando a troca de fato acontece.
+const pendingRestorePath = path.join(dir, 'restore-pending.db');
+if (fs.existsSync(pendingRestorePath)) {
+  if (fs.existsSync(config.auth.sqlitePath)) {
+    const safetyPath = path.join(dir, `pre-restore-${Date.now()}.db`);
+    fs.copyFileSync(config.auth.sqlitePath, safetyPath);
+    console.log(`[sqlite] restaurando backup — cópia de segurança do banco anterior salva em ${safetyPath}`);
+  }
+  fs.renameSync(pendingRestorePath, config.auth.sqlitePath);
+  for (const suffix of ['-wal', '-shm']) {
+    const sidecar = `${config.auth.sqlitePath}${suffix}`;
+    if (fs.existsSync(sidecar)) fs.unlinkSync(sidecar);
+  }
+}
+
 export const db = new Database(config.auth.sqlitePath);
 db.pragma('journal_mode = WAL');
 
@@ -121,6 +141,28 @@ db.exec(`
     image_url TEXT NOT NULL DEFAULT '',
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Trilha de auditoria: quem fez o quê (login, criar/editar/remover
+  -- dispositivo, pavimento, usuário, alterar configurações, backup/restore).
+  -- Não guarda senhas nem tokens, só uma descrição legível da ação.
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL DEFAULT (datetime('now')),
+    username TEXT NOT NULL DEFAULT '',
+    action TEXT NOT NULL,
+    details TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS idx_audit_log_at ON audit_log(at DESC);
+
+  -- Contador de tentativas de login malsucedidas por origem (IP), pra
+  -- bloquear temporariamente depois de várias falhas seguidas (ver
+  -- loginThrottleService). Não guarda a senha tentada, só a contagem.
+  CREATE TABLE IF NOT EXISTS login_attempts (
+    key TEXT PRIMARY KEY,
+    fail_count INTEGER NOT NULL DEFAULT 0,
+    first_fail_at TEXT NOT NULL,
+    locked_until TEXT
   );
 `);
 

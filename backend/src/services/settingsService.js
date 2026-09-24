@@ -24,6 +24,18 @@ const DEFAULTS = {
   executiveReportFrequency: process.env.EXECUTIVE_REPORT_FREQUENCY || 'off',
   // Bookkeeping interno do agendador — não editável pela tela de Configurações.
   executiveReportLastSentAt: '',
+
+  // Backup automático diário do banco (ver backupScheduler) — 'false' desliga.
+  backupEnabled: 'true',
+  backupRetentionDays: String(process.env.BACKUP_RETENTION_DAYS || 14),
+  // Bookkeeping interno do agendador — não editável pela tela de Configurações.
+  backupLastAt: '',
+
+  // Bloqueio temporário de login após várias tentativas seguidas (ver
+  // loginThrottleService) — janela deslizante em minutos.
+  loginMaxAttempts: String(process.env.LOGIN_MAX_ATTEMPTS || 5),
+  loginAttemptWindowMinutes: String(process.env.LOGIN_ATTEMPT_WINDOW_MINUTES || 15),
+  loginLockoutMinutes: String(process.env.LOGIN_LOCKOUT_MINUTES || 15),
 };
 
 const ALLOWED_KEYS = new Set(Object.keys(DEFAULTS));

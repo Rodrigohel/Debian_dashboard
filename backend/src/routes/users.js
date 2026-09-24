@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/sqlite.js';
+import { logAudit } from '../services/auditService.js';
 
 export const usersRouter = Router();
 
 const listStmt = db.prepare('SELECT id, username, display_name AS displayName, role, created_at AS createdAt FROM users ORDER BY created_at');
 const insertStmt = db.prepare('INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, ?, ?)');
+const getByIdStmt = db.prepare('SELECT username FROM users WHERE id = ?');
 const deleteStmt = db.prepare('DELETE FROM users WHERE id = ?');
 const countStmt = db.prepare('SELECT COUNT(*) AS n FROM users');
 
@@ -20,7 +22,9 @@ usersRouter.post('/', (req, res) => {
   }
   try {
     const hash = bcrypt.hashSync(password, 10);
-    const info = insertStmt.run(username.trim(), (displayName || username).trim(), hash, role === 'admin' ? 'admin' : 'user');
+    const finalRole = role === 'admin' ? 'admin' : 'user';
+    const info = insertStmt.run(username.trim(), (displayName || username).trim(), hash, finalRole);
+    logAudit({ username: req.user?.username, action: 'user.create', details: `Usuário "${username.trim()}" criado (${finalRole === 'admin' ? 'administrador' : 'usuário'})` });
     res.status(201).json({ id: info.lastInsertRowid });
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) {
@@ -34,6 +38,8 @@ usersRouter.delete('/:id', (req, res) => {
   if (countStmt.get().n <= 1) {
     return res.status(400).json({ error: 'Não é possível remover o único usuário do painel.' });
   }
+  const target = getByIdStmt.get(req.params.id);
   deleteStmt.run(req.params.id);
+  if (target) logAudit({ username: req.user?.username, action: 'user.delete', details: `Usuário "${target.username}" removido` });
   res.status(204).end();
 });

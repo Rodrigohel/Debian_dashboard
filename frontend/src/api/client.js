@@ -193,6 +193,32 @@ export const api = {
   users: () => request('/api/users'),
   createUser: (data) => request('/api/users', { method: 'POST', body: JSON.stringify(data) }),
   deleteUser: (id) => request(`/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  auditLog: (params = {}) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined));
+    return request(`/api/audit?${qs}`);
+  },
+
+  backups: () => request('/api/backup'),
+  runBackup: () => request('/api/backup/run', { method: 'POST' }),
+  deleteBackup: (name) => request(`/api/backup/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  restoreBackup: (name) => request(`/api/backup/${encodeURIComponent(name)}/restore`, { method: 'POST' }),
+  downloadBackup: (name) => downloadFile(`/api/backup/${encodeURIComponent(name)}/download`, name),
+  restoreBackupUpload: async (file) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${API_URL}/api/backup/restore-upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Erro ${res.status}`);
+    }
+    return res.json();
+  },
 };
 
 export function connectLiveSocket(onMessage) {

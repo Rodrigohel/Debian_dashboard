@@ -4,6 +4,7 @@ import path from 'node:path';
 import multer from 'multer';
 import { getSettings, setSettings } from '../services/settingsService.js';
 import { sendTelegramMessageWith } from '../services/telegramService.js';
+import { logAudit } from '../services/auditService.js';
 
 export const settingsRouter = Router();
 
@@ -38,6 +39,7 @@ settingsRouter.put('/', (req, res) => {
   const {
     companyName, siteName, pingIntervalSeconds, pingTimeoutMs, offlineThresholdFails, alertReminderIntervalMinutes,
     networkBase, networkHistoryRetentionHours, telegramBotToken, telegramChatId, executiveReportFrequency,
+    backupEnabled, backupRetentionDays, loginMaxAttempts, loginAttemptWindowMinutes, loginLockoutMinutes,
   } = req.body || {};
   const updates = {};
 
@@ -92,7 +94,35 @@ settingsRouter.put('/', (req, res) => {
     updates.executiveReportFrequency = executiveReportFrequency;
   }
 
-  res.json(setSettings(updates));
+  if (backupEnabled !== undefined) updates.backupEnabled = backupEnabled ? 'true' : 'false';
+
+  if (backupRetentionDays !== undefined) {
+    const n = Number(backupRetentionDays);
+    if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: 'Retenção de backups deve ser de pelo menos 1 dia.' });
+    updates.backupRetentionDays = n;
+  }
+
+  if (loginMaxAttempts !== undefined) {
+    const n = Number(loginMaxAttempts);
+    if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: 'Tentativas máximas de login deve ser pelo menos 1.' });
+    updates.loginMaxAttempts = n;
+  }
+
+  if (loginAttemptWindowMinutes !== undefined) {
+    const n = Number(loginAttemptWindowMinutes);
+    if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: 'Janela de tentativas de login deve ser de pelo menos 1 minuto.' });
+    updates.loginAttemptWindowMinutes = n;
+  }
+
+  if (loginLockoutMinutes !== undefined) {
+    const n = Number(loginLockoutMinutes);
+    if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: 'Duração do bloqueio de login deve ser de pelo menos 1 minuto.' });
+    updates.loginLockoutMinutes = n;
+  }
+
+  const result = setSettings(updates);
+  logAudit({ username: req.user?.username, action: 'settings.update', details: `Configurações atualizadas (${Object.keys(updates).join(', ') || 'nenhum campo'})` });
+  res.json(result);
 });
 
 settingsRouter.post('/telegram/test', async (req, res) => {

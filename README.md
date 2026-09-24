@@ -121,6 +121,22 @@ público opcional.
 - **Notificações no próprio painel**: ações como escanear, identificar,
   exportar ou importar mostram um aviso discreto (toast) no canto da tela,
   em vez de um alerta bloqueante do navegador.
+- **Backup automático do banco**: cópia comprimida (`.db.gz`) gerada 1x por
+  dia sozinha, com rotação automática (mantém só os últimos N dias,
+  configurável) — Configurações → aba "Backup". Também dá pra gerar um
+  backup na hora, baixar qualquer um deles, ou **restaurar** (a partir de um
+  backup já salvo no servidor ou de um arquivo enviado pelo navegador): o
+  painel reinicia sozinho pra aplicar a troca com segurança, e guarda uma
+  cópia do banco anterior antes de sobrescrever, caso o backup escolhido
+  seja o errado.
+- **Log de auditoria**: histórico de quem fez o quê — login (inclusive
+  tentativas falhas), criar/editar/remover dispositivo ou pavimento,
+  criar/remover usuário, alterar configurações e backup/restore.
+  Configurações → aba "Segurança".
+- **Bloqueio de login por tentativas**: depois de várias senhas erradas
+  seguidas (padrão: 5, numa janela de 15min), a origem fica temporariamente
+  bloqueada (padrão: 15min) — limites configuráveis em Configurações → aba
+  "Segurança".
 
 ## Instalação — um único comando
 

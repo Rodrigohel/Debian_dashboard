@@ -14,9 +14,12 @@ import { usersRouter } from './routes/users.js';
 import { statsRouter } from './routes/stats.js';
 import { historyRouter } from './routes/history.js';
 import { floorsRouter } from './routes/floors.js';
+import { auditRouter } from './routes/audit.js';
+import { backupRouter } from './routes/backup.js';
 import { requireAuth, requireAdmin } from './middleware/auth.js';
 import { startMonitorLoop } from './services/monitorService.js';
 import { startExecutiveReportScheduler } from './services/executiveReportScheduler.js';
+import { startBackupScheduler } from './services/backupScheduler.js';
 import { listDevices } from './services/devicesService.js';
 import './db/sqlite.js';
 
@@ -41,6 +44,8 @@ app.use('/api/alerts', requireAuth, alertsRouter);
 app.use('/api/stats', requireAuth, statsRouter);
 app.use('/api/history', requireAuth, historyRouter);
 app.use('/api/floors', requireAuth, floorsRouter);
+app.use('/api/audit', requireAuth, requireAdmin, auditRouter);
+app.use('/api/backup', requireAuth, requireAdmin, backupRouter);
 
 // Serve o próprio frontend buildado (frontend/dist, pasta irmã de backend/),
 // quando presente — assim um único processo Node atende tudo (API, WS e a
@@ -81,6 +86,7 @@ startMonitorLoop((results) => {
   broadcast('devices:update', results);
 });
 startExecutiveReportScheduler();
+startBackupScheduler();
 
 server.listen(config.port, '0.0.0.0', () => {
   const total = listDevices().length;

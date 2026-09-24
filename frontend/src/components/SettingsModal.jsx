@@ -3,6 +3,12 @@ import { api } from '../api/client.js';
 import { showToast } from '../utils/toast.js';
 import Icon, { ICONS } from './Icon.jsx';
 
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function Field({ colors, label, children, hint }) {
   return (
     <div style={{ marginBottom: 14 }}>
@@ -198,6 +204,176 @@ function UsersTab({ colors, currentUsername }) {
   );
 }
 
+const AUDIT_PAGE_SIZE = 20;
+
+function SecurityTab({ colors, form, setForm }) {
+  const [auditLog, setAuditLog] = useState(null);
+  const [auditError, setAuditError] = useState('');
+  const [offset, setOffset] = useState(0);
+
+  function loadAudit(newOffset) {
+    api.auditLog({ limit: AUDIT_PAGE_SIZE, offset: newOffset })
+      .then((res) => { setAuditLog(res); setOffset(newOffset); })
+      .catch((err) => setAuditError(err.message));
+  }
+  useEffect(() => { loadAudit(0); }, []);
+
+  return (
+    <>
+      <SectionLabel colors={colors}>Bloqueio de login por tentativas</SectionLabel>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <Field colors={colors} label="Tentativas até bloquear">
+          <input type="number" min={1} value={form.loginMaxAttempts} onChange={(e) => setForm({ ...form, loginMaxAttempts: e.target.value })} style={inputStyle(colors)} />
+        </Field>
+        <Field colors={colors} label="Janela (min)" hint="Falhas fora dessa janela não contam mais.">
+          <input type="number" min={1} value={form.loginAttemptWindowMinutes} onChange={(e) => setForm({ ...form, loginAttemptWindowMinutes: e.target.value })} style={inputStyle(colors)} />
+        </Field>
+        <Field colors={colors} label="Bloqueio dura (min)">
+          <input type="number" min={1} value={form.loginLockoutMinutes} onChange={(e) => setForm({ ...form, loginLockoutMinutes: e.target.value })} style={inputStyle(colors)} />
+        </Field>
+      </div>
+
+      <SectionLabel colors={colors}>Log de auditoria</SectionLabel>
+      {auditError && <div style={{ color: colors.red, fontSize: 13, marginBottom: 10 }}>{auditError}</div>}
+      {!auditLog && !auditError && <div style={{ fontSize: 13, color: colors.textSecondary }}>Carregando...</div>}
+      {auditLog && (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto', marginBottom: 10 }}>
+            {auditLog.data.length === 0 && <div style={{ fontSize: 12.5, color: colors.textTertiary }}>Nenhum evento registrado ainda.</div>}
+            {auditLog.data.map((entry) => (
+              <div key={entry.id} style={{ border: `1px solid ${colors.border}`, borderRadius: 9, padding: '7px 10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.textPrimary }}>{entry.username}</span>
+                  <span style={{ fontSize: 11, color: colors.textTertiary, whiteSpace: 'nowrap' }}>{new Date(entry.at).toLocaleString('pt-BR')}</span>
+                </div>
+                <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>{entry.details}</div>
+              </div>
+            ))}
+          </div>
+          {auditLog.total > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11.5, color: colors.textTertiary }}>{offset + 1}–{Math.min(offset + AUDIT_PAGE_SIZE, auditLog.total)} de {auditLog.total}</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" disabled={offset === 0} onClick={() => loadAudit(Math.max(0, offset - AUDIT_PAGE_SIZE))} style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, color: colors.textPrimary, borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: offset === 0 ? 'default' : 'pointer', opacity: offset === 0 ? 0.5 : 1 }}>Anterior</button>
+                <button type="button" disabled={offset + AUDIT_PAGE_SIZE >= auditLog.total} onClick={() => loadAudit(offset + AUDIT_PAGE_SIZE)} style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, color: colors.textPrimary, borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 700, cursor: (offset + AUDIT_PAGE_SIZE >= auditLog.total) ? 'default' : 'pointer', opacity: (offset + AUDIT_PAGE_SIZE >= auditLog.total) ? 0.5 : 1 }}>Próximo</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function BackupTab({ colors, form, setForm }) {
+  const [backups, setBackups] = useState(null);
+  const [error, setError] = useState('');
+  const [running, setRunning] = useState(false);
+  const [busyName, setBusyName] = useState('');
+
+  const load = () => api.backups().then((res) => setBackups(res.data)).catch((err) => setError(err.message));
+  useEffect(() => { load(); }, []);
+
+  async function handleRunBackup() {
+    setRunning(true);
+    setError('');
+    try {
+      await api.runBackup();
+      showToast('Backup criado com sucesso.', 'success');
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function handleDelete(name) {
+    if (!confirm(`Remover o backup "${name}"?`)) return;
+    setBusyName(name);
+    try {
+      await api.deleteBackup(name);
+      load();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setBusyName('');
+    }
+  }
+
+  async function handleRestore(name) {
+    if (!confirm(`Restaurar o banco a partir de "${name}"? Isso substitui TODOS os dados atuais (dispositivos, usuários, histórico) pelos desse backup, e o painel vai reiniciar em seguida. Essa ação não pode ser desfeita.`)) return;
+    setBusyName(name);
+    try {
+      const res = await api.restoreBackup(name);
+      showToast(res.message, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+      setBusyName('');
+    }
+  }
+
+  async function handleUploadRestore(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!confirm(`Restaurar o banco a partir do arquivo "${file.name}"? Isso substitui TODOS os dados atuais pelos desse backup, e o painel vai reiniciar em seguida. Essa ação não pode ser desfeita.`)) return;
+    try {
+      const res = await api.restoreBackupUpload(file);
+      showToast(res.message, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  return (
+    <>
+      <SectionLabel colors={colors}>Backup automático</SectionLabel>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: colors.textSecondary, marginBottom: 12, cursor: 'pointer' }}>
+        <input type="checkbox" checked={form.backupEnabled} onChange={(e) => setForm({ ...form, backupEnabled: e.target.checked })} />
+        Fazer backup do banco automaticamente, 1x por dia
+      </label>
+      <Field colors={colors} label="Manter backups por (dias)" hint="Backups mais antigos que isso são apagados automaticamente.">
+        <input type="number" min={1} value={form.backupRetentionDays} onChange={(e) => setForm({ ...form, backupRetentionDays: e.target.value })} style={inputStyle(colors)} />
+      </Field>
+
+      <SectionLabel colors={colors}>Backups disponíveis</SectionLabel>
+      {error && <div style={{ color: colors.red, fontSize: 13, marginBottom: 10 }}>{error}</div>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <button type="button" onClick={handleRunBackup} disabled={running} style={{ border: 'none', background: colors.primary, color: '#fff', borderRadius: 9, padding: '8px 12px', fontSize: 12.5, fontWeight: 700, cursor: running ? 'default' : 'pointer', opacity: running ? 0.7 : 1 }}>
+          {running ? 'Gerando...' : 'Fazer backup agora'}
+        </button>
+        <label style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, color: colors.textPrimary, borderRadius: 9, padding: '8px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
+          Restaurar de um arquivo...
+          <input type="file" accept=".gz" onChange={handleUploadRestore} style={{ display: 'none' }} />
+        </label>
+      </div>
+
+      {!backups && !error && <div style={{ fontSize: 13, color: colors.textSecondary }}>Carregando...</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
+        {backups?.length === 0 && <div style={{ fontSize: 12.5, color: colors.textTertiary }}>Nenhum backup ainda.</div>}
+        {backups?.map((b) => (
+          <div key={b.name} style={{ display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${colors.border}`, borderRadius: 9, padding: '8px 12px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: colors.textPrimary }}>{new Date(b.createdAt).toLocaleString('pt-BR')}</div>
+              <div style={{ fontSize: 11, color: colors.textTertiary }}>{formatBytes(b.sizeBytes)}</div>
+            </div>
+            <button type="button" onClick={() => api.downloadBackup(b.name)} title="Baixar" disabled={busyName === b.name} style={{ border: 'none', background: 'transparent', color: colors.textSecondary, cursor: 'pointer', display: 'flex', padding: 4 }}>
+              <Icon paths={ICONS.download} size={15} strokeWidth={2} />
+            </button>
+            <button type="button" onClick={() => handleRestore(b.name)} title="Restaurar" disabled={busyName === b.name} style={{ border: 'none', background: 'transparent', color: colors.primary, cursor: 'pointer', display: 'flex', padding: 4 }}>
+              <Icon paths={ICONS.refresh} size={15} strokeWidth={2} />
+            </button>
+            <button type="button" onClick={() => handleDelete(b.name)} title="Remover" disabled={busyName === b.name} style={{ border: 'none', background: 'transparent', color: colors.red, cursor: 'pointer', display: 'flex', padding: 4 }}>
+              <Icon paths={ICONS.trash} size={15} strokeWidth={2} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export default function SettingsModal({ colors, settings, onClose, onSaved, currentUsername }) {
   const [tab, setTab] = useState('general');
   const [form, setForm] = useState({
@@ -212,6 +388,11 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
     telegramBotToken: settings.telegramBotToken || '',
     telegramChatId: settings.telegramChatId || '',
     executiveReportFrequency: settings.executiveReportFrequency || 'off',
+    backupEnabled: settings.backupEnabled !== 'false',
+    backupRetentionDays: settings.backupRetentionDays || '14',
+    loginMaxAttempts: settings.loginMaxAttempts || '5',
+    loginAttemptWindowMinutes: settings.loginAttemptWindowMinutes || '15',
+    loginLockoutMinutes: settings.loginLockoutMinutes || '15',
     logoFile: null,
   });
   const [saving, setSaving] = useState(false);
@@ -250,7 +431,7 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 1000 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 1000 }}>
       <div onClick={(e) => e.stopPropagation()} className="modal-card" style={{ width: '100%', maxWidth: 540, background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '24px 26px', boxShadow: colors.shadow, overflowY: 'auto', position: 'relative' }}>
         <button onClick={onClose} aria-label="Fechar" style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'transparent', color: colors.textTertiary, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
 
@@ -263,11 +444,15 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
           <TabButton colors={colors} active={tab === 'general'} onClick={() => setTab('general')}>Geral</TabButton>
           <TabButton colors={colors} active={tab === 'telegram'} onClick={() => setTab('telegram')}>Notificações</TabButton>
           <TabButton colors={colors} active={tab === 'users'} onClick={() => setTab('users')}>Usuários</TabButton>
+          <TabButton colors={colors} active={tab === 'security'} onClick={() => setTab('security')}>Segurança</TabButton>
+          <TabButton colors={colors} active={tab === 'backup'} onClick={() => setTab('backup')}>Backup</TabButton>
         </div>
 
         {tab === 'general' && <GeneralTab colors={colors} form={form} setForm={setForm} />}
         {tab === 'telegram' && <TelegramTab colors={colors} form={form} setForm={setForm} onTest={handleTestTelegram} testing={testing} />}
         {tab === 'users' && <UsersTab colors={colors} currentUsername={currentUsername} />}
+        {tab === 'security' && <SecurityTab colors={colors} form={form} setForm={setForm} />}
+        {tab === 'backup' && <BackupTab colors={colors} form={form} setForm={setForm} />}
 
         {currentUsername && tab !== 'users' && (
           <div style={{ fontSize: 12, color: colors.textTertiary, margin: '18px 0 4px' }}>Logado como <strong>{currentUsername}</strong></div>

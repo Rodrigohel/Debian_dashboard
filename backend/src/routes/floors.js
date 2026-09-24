@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import multer from 'multer';
 import { requireAdmin } from '../middleware/auth.js';
-import { listFloors, createFloor, renameFloor, updateFloorImage, deleteFloor, reorderFloors } from '../services/floorsService.js';
+import { listFloors, getFloor, createFloor, renameFloor, updateFloorImage, deleteFloor, reorderFloors } from '../services/floorsService.js';
+import { logAudit } from '../services/auditService.js';
 
 export const floorsRouter = Router();
 
@@ -39,26 +40,34 @@ floorsRouter.post('/', requireAdmin, (req, res) => {
     const name = String(req.body?.name || '').trim();
     if (!name) return res.status(400).json({ error: 'Nome do pavimento é obrigatório.' });
     if (!req.file) return res.status(400).json({ error: 'Envie a imagem da planta baixa.' });
-    res.status(201).json(createFloor({ name, imageUrl: `/api/uploads/${req.file.filename}` }));
+    const floor = createFloor({ name, imageUrl: `/api/uploads/${req.file.filename}` });
+    logAudit({ username: req.user?.username, action: 'floor.create', details: `Pavimento "${floor.name}" criado` });
+    res.status(201).json(floor);
   });
 });
 
 floorsRouter.put('/:id', requireAdmin, (req, res) => {
   const name = String(req.body?.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Nome do pavimento é obrigatório.' });
-  res.json(renameFloor(Number(req.params.id), name));
+  const floor = renameFloor(Number(req.params.id), name);
+  logAudit({ username: req.user?.username, action: 'floor.update', details: `Pavimento renomeado para "${name}"` });
+  res.json(floor);
 });
 
 floorsRouter.post('/:id/image', requireAdmin, (req, res) => {
   upload.single('image')(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'Envie uma imagem.' });
-    res.json(updateFloorImage(Number(req.params.id), `/api/uploads/${req.file.filename}`));
+    const floor = updateFloorImage(Number(req.params.id), `/api/uploads/${req.file.filename}`);
+    logAudit({ username: req.user?.username, action: 'floor.update', details: `Imagem do pavimento "${floor.name}" atualizada` });
+    res.json(floor);
   });
 });
 
 floorsRouter.delete('/:id', requireAdmin, (req, res) => {
+  const floor = getFloor(Number(req.params.id));
   deleteFloor(Number(req.params.id));
+  if (floor) logAudit({ username: req.user?.username, action: 'floor.delete', details: `Pavimento "${floor.name}" removido` });
   res.status(204).end();
 });
 
