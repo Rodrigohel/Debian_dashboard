@@ -40,6 +40,7 @@ settingsRouter.put('/', (req, res) => {
     companyName, siteName, pingIntervalSeconds, pingTimeoutMs, offlineThresholdFails, alertReminderIntervalMinutes,
     networkBase, networkHistoryRetentionHours, telegramBotToken, telegramChatId, executiveReportFrequency,
     backupEnabled, backupRetentionDays, loginMaxAttempts, loginAttemptWindowMinutes, loginLockoutMinutes,
+    heartbeatEnabled, heartbeatFrequencyHours,
   } = req.body || {};
   const updates = {};
 
@@ -118,6 +119,14 @@ settingsRouter.put('/', (req, res) => {
     const n = Number(loginLockoutMinutes);
     if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: 'Duração do bloqueio de login deve ser de pelo menos 1 minuto.' });
     updates.loginLockoutMinutes = n;
+  }
+
+  if (heartbeatEnabled !== undefined) updates.heartbeatEnabled = heartbeatEnabled ? 'true' : 'false';
+
+  if (heartbeatFrequencyHours !== undefined) {
+    const n = Number(heartbeatFrequencyHours);
+    if (!Number.isFinite(n) || n < 1) return res.status(400).json({ error: 'Frequência do heartbeat deve ser de pelo menos 1 hora.' });
+    updates.heartbeatFrequencyHours = n;
   }
 
   const result = setSettings(updates);

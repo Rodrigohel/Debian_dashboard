@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "seed:user": "node src/db/seedUser.js",
-    "import:devices": "node src/db/importDevices.js"
+    "import:devices": "node src/db/importDevices.js",
+    "reset:totp": "node src/db/resetTotp.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -16,6 +17,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.4.0",
     "oui-data": "^2.1.24",

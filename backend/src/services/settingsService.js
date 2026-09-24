@@ -36,6 +36,13 @@ const DEFAULTS = {
   loginMaxAttempts: String(process.env.LOGIN_MAX_ATTEMPTS || 5),
   loginAttemptWindowMinutes: String(process.env.LOGIN_ATTEMPT_WINDOW_MINUTES || 15),
   loginLockoutMinutes: String(process.env.LOGIN_LOCKOUT_MINUTES || 15),
+
+  // "Estou vivo" periódico pelo Telegram já configurado (ver heartbeatScheduler)
+  // — desligado por padrão, mesmo comportamento do relatório executivo.
+  heartbeatEnabled: 'false',
+  heartbeatFrequencyHours: String(process.env.HEARTBEAT_FREQUENCY_HOURS || 24),
+  // Bookkeeping interno do agendador — não editável pela tela de Configurações.
+  heartbeatLastSentAt: '',
 };
 
 const ALLOWED_KEYS = new Set(Object.keys(DEFAULTS));

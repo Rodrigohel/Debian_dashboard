@@ -83,7 +83,14 @@ async function downloadFile(path, filename) {
 export const api = {
   login: (username, password) =>
     request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  loginTotp: (totpToken, code) =>
+    request('/api/auth/login/totp', { method: 'POST', body: JSON.stringify({ totpToken, code }) }),
   me: () => request('/api/auth/me'),
+
+  totpSetup: () => request('/api/auth/totp/setup', { method: 'POST' }),
+  totpEnable: (secret, code) => request('/api/auth/totp/enable', { method: 'POST', body: JSON.stringify({ secret, code }) }),
+  totpDisable: (code) => request('/api/auth/totp/disable', { method: 'POST', body: JSON.stringify({ code }) }),
+  adminDisableTotp: (userId) => request(`/api/users/${userId}/totp-disable`, { method: 'POST' }),
 
   devices: (params = {}) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v));

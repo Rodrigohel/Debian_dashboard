@@ -17,8 +17,19 @@ export function useAuth() {
       .finally(() => setChecking(false));
   }, []);
 
+  // Com 2FA ativado pro usuário, o login não termina aqui — a API responde
+  // { requiresTotp, totpToken } em vez de um token de acesso, e quem chamou
+  // (LoginModal) precisa pedir o código e chamar completeTotpLogin.
   const login = useCallback(async (username, password) => {
-    const { token, user: u } = await api.login(username, password);
+    const result = await api.login(username, password);
+    if (result.requiresTotp) return result;
+    setToken(result.token);
+    setUser(result.user);
+    return result.user;
+  }, []);
+
+  const completeTotpLogin = useCallback(async (totpToken, code) => {
+    const { token, user: u } = await api.loginTotp(totpToken, code);
     setToken(token);
     setUser(u);
     return u;
@@ -29,5 +40,5 @@ export function useAuth() {
     setUser(null);
   }, []);
 
-  return { user, checking, login, logout, isAuthenticated: !!user };
+  return { user, checking, login, completeTotpLogin, logout, isAuthenticated: !!user };
 }

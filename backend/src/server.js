@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -20,10 +21,19 @@ import { requireAuth, requireAdmin } from './middleware/auth.js';
 import { startMonitorLoop } from './services/monitorService.js';
 import { startExecutiveReportScheduler } from './services/executiveReportScheduler.js';
 import { startBackupScheduler } from './services/backupScheduler.js';
+import { startHeartbeatScheduler } from './services/heartbeatScheduler.js';
 import { listDevices } from './services/devicesService.js';
 import './db/sqlite.js';
 
 const app = express();
+app.use(helmet({
+  // HSTS força HTTPS pra sempre no navegador — perigoso aqui: o painel
+  // normalmente é acessado direto por IP/Tailscale sem certificado, e um
+  // acesso anterior via um domínio com HTTPS deixaria esse navegador incapaz
+  // de voltar a acessar por HTTP. Quem colocar atrás de um Nginx/Apache com
+  // TLS de verdade (ver README) pode ligar HSTS manualmente nesse proxy.
+  hsts: false,
+}));
 app.use(cors({ origin: config.corsOrigin }));
 app.use(express.json());
 
@@ -87,6 +97,7 @@ startMonitorLoop((results) => {
 });
 startExecutiveReportScheduler();
 startBackupScheduler();
+startHeartbeatScheduler();
 
 server.listen(config.port, '0.0.0.0', () => {
   const total = listDevices().length;

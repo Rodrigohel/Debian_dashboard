@@ -5,9 +5,11 @@ import { logAudit } from '../services/auditService.js';
 
 export const usersRouter = Router();
 
-const listStmt = db.prepare('SELECT id, username, display_name AS displayName, role, created_at AS createdAt FROM users ORDER BY created_at');
+const listStmt = db.prepare('SELECT id, username, display_name AS displayName, role, totp_enabled AS totpEnabled, created_at AS createdAt FROM users ORDER BY created_at');
 const insertStmt = db.prepare('INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, ?, ?)');
 const getByIdStmt = db.prepare('SELECT username FROM users WHERE id = ?');
+const getTotpStmt = db.prepare('SELECT username, totp_enabled AS totpEnabled FROM users WHERE id = ?');
+const disableTotpStmt = db.prepare("UPDATE users SET totp_secret = '', totp_enabled = 0, totp_recovery_codes = '[]' WHERE id = ?");
 const deleteStmt = db.prepare('DELETE FROM users WHERE id = ?');
 const countStmt = db.prepare('SELECT COUNT(*) AS n FROM users');
 
@@ -32,6 +34,19 @@ usersRouter.post('/', (req, res) => {
     }
     res.status(500).json({ error: 'Erro ao criar usuário.' });
   }
+});
+
+// Escape hatch pra quando um usuário perde o celular/app autenticador e os
+// códigos de recuperação: um admin desativa o 2FA dele sem precisar de
+// código (o próprio dono usa POST /api/auth/totp/disable, que exige um
+// código válido — essa aqui é só pra quando isso não é mais possível).
+usersRouter.post('/:id/totp-disable', (req, res) => {
+  const target = getTotpStmt.get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'Usuário não encontrado.' });
+  if (!target.totpEnabled) return res.status(400).json({ error: '2FA não está ativado para esse usuário.' });
+  disableTotpStmt.run(req.params.id);
+  logAudit({ username: req.user?.username, action: 'user.2fa_admin_disable', details: `2FA de "${target.username}" desativado por um administrador` });
+  res.json({ ok: true });
 });
 
 usersRouter.delete('/:id', (req, res) => {

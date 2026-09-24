@@ -137,6 +137,21 @@ público opcional.
   seguidas (padrão: 5, numa janela de 15min), a origem fica temporariamente
   bloqueada (padrão: 15min) — limites configuráveis em Configurações → aba
   "Segurança".
+- **Autenticação em duas etapas (2FA)**: cada usuário liga/desliga por conta
+  própria em Configurações → aba "Segurança" — escaneia um QR code com
+  Google Authenticator/Authy e confirma com um código de 6 dígitos. Gera 8
+  códigos de recuperação de uso único (pra quem perder o celular). Um
+  administrador pode desativar o 2FA de outro usuário travado (sem precisar
+  do código dele) na aba "Usuários"; se só existir um admin e ele mesmo
+  travar, `node src/db/resetTotp.js <usuario>` no servidor resolve.
+- **Heartbeat ("estou vivo")**: mensagem periódica pelo Telegram já
+  configurado confirmando que o painel está ativo — se ela parar de chegar
+  no horário esperado, é sinal de que o **servidor** caiu (não só o
+  processo, que o systemd já reinicia sozinho). Desligado por padrão,
+  configurável em Configurações → aba "Notificações".
+- **Cabeçalhos de segurança HTTP** (helmet): CSP, X-Frame-Options e outros
+  cabeçalhos padrão de proteção, ativados por padrão em toda resposta do
+  backend.
 
 ## Instalação — um único comando
 

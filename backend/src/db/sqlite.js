@@ -188,6 +188,18 @@ for (const [column, ddl] of [
   if (!deviceColumns.includes(column)) db.exec(ddl);
 }
 
+// Autenticação em duas etapas (TOTP), por usuário — cada um liga/desliga a
+// própria (ver totpService); recovery_codes guarda hashes bcrypt de códigos
+// de uso único, pra quem perder o app autenticador não ficar trancado fora.
+const userColumns = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+for (const [column, ddl] of [
+  ['totp_secret', "ALTER TABLE users ADD COLUMN totp_secret TEXT NOT NULL DEFAULT ''"],
+  ['totp_enabled', 'ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0'],
+  ['totp_recovery_codes', "ALTER TABLE users ADD COLUMN totp_recovery_codes TEXT NOT NULL DEFAULT '[]'"],
+]) {
+  if (!userColumns.includes(column)) db.exec(ddl);
+}
+
 // Migração única: a primeira versão da planta baixa usava uma imagem só
 // (guardada em settings.floorPlanUrl) pra todos os dispositivos. Ao migrar
 // pra múltiplos pavimentos, se já existir aquela imagem antiga e nenhum

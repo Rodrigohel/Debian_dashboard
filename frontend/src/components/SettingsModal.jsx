@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { api } from '../api/client.js';
 import { showToast } from '../utils/toast.js';
 import Icon, { ICONS } from './Icon.jsx';
@@ -112,6 +113,15 @@ function TelegramTab({ colors, form, setForm, onTest, testing }) {
           <option value="monthly">Mensal (últimos 30 dias)</option>
         </select>
       </Field>
+
+      <SectionLabel colors={colors}>Heartbeat ("estou vivo")</SectionLabel>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: colors.textSecondary, marginBottom: 12, cursor: 'pointer' }}>
+        <input type="checkbox" checked={form.heartbeatEnabled} onChange={(e) => setForm({ ...form, heartbeatEnabled: e.target.checked })} />
+        Mandar uma mensagem periódica confirmando que o painel está ativo
+      </label>
+      <Field colors={colors} label="A cada quantas horas" hint="Se essa mensagem parar de chegar no intervalo esperado, é sinal de que o servidor caiu — não só o processo (isso o systemd já reinicia sozinho), mas a própria máquina, rede ou energia.">
+        <input type="number" min={1} value={form.heartbeatFrequencyHours} onChange={(e) => setForm({ ...form, heartbeatFrequencyHours: e.target.value })} style={inputStyle(colors)} disabled={!form.heartbeatEnabled} />
+      </Field>
     </>
   );
 }
@@ -152,6 +162,17 @@ function UsersTab({ colors, currentUsername }) {
     }
   }
 
+  async function handleDisableTotp(id, username) {
+    if (!confirm(`Desativar o 2FA de "${username}"? Use isso quando a pessoa perdeu o acesso ao app autenticador e aos códigos de recuperação.`)) return;
+    try {
+      await api.adminDisableTotp(id);
+      load();
+      showToast(`2FA de "${username}" desativado.`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
   return (
     <>
       <SectionLabel colors={colors}>Usuários do painel</SectionLabel>
@@ -161,8 +182,24 @@ function UsersTab({ colors, currentUsername }) {
           <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${colors.border}`, borderRadius: 9, padding: '8px 12px' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary }}>{u.displayName} <span style={{ color: colors.textTertiary, fontWeight: 400 }}>({u.username})</span></div>
-              <div style={{ fontSize: 11.5, color: colors.textTertiary }}>{u.role === 'admin' ? 'Administrador' : 'Usuário'}</div>
+              <div style={{ fontSize: 11.5, color: colors.textTertiary, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {u.role === 'admin' ? 'Administrador' : 'Usuário'}
+                {!!u.totpEnabled && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: colors.green, fontWeight: 700 }}>
+                    <Icon paths={ICONS.shield} size={11} strokeWidth={2.2} /> 2FA
+                  </span>
+                )}
+              </div>
             </div>
+            {!!u.totpEnabled && (
+              <button
+                onClick={() => handleDisableTotp(u.id, u.username)}
+                title="Desativar 2FA (se a pessoa perdeu o acesso)"
+                style={{ border: 'none', background: 'transparent', color: colors.textTertiary, cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 4 }}
+              >
+                <Icon paths={ICONS.shield} size={14} strokeWidth={2.2} />
+              </button>
+            )}
             <button
               onClick={() => handleDelete(u.id, u.username)}
               title="Remover"
@@ -204,6 +241,151 @@ function UsersTab({ colors, currentUsername }) {
   );
 }
 
+function TwoFactorSection({ colors }) {
+  const [me, setMe] = useState(null);
+  const [error, setError] = useState('');
+  const [step, setStep] = useState('idle'); // idle | setup | recovery
+  const [setupData, setSetupData] = useState(null);
+  const [code, setCode] = useState('');
+  const [recoveryCodes, setRecoveryCodes] = useState(null);
+  const [disableCode, setDisableCode] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = () => api.me().then(setMe).catch((err) => setError(err.message));
+  useEffect(() => { load(); }, []);
+
+  async function handleStartSetup() {
+    setError('');
+    setBusy(true);
+    try {
+      const { secret, otpauthUri } = await api.totpSetup();
+      const qrDataUrl = await QRCode.toDataURL(otpauthUri, { width: 168, margin: 1 });
+      setSetupData({ secret, qrDataUrl });
+      setStep('setup');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleConfirmEnable(e) {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      const { recoveryCodes: codes } = await api.totpEnable(setupData.secret, code);
+      setRecoveryCodes(codes);
+      setStep('recovery');
+      setCode('');
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleFinishSetup() {
+    setStep('idle');
+    setSetupData(null);
+    setRecoveryCodes(null);
+  }
+
+  async function handleDisable(e) {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      await api.totpDisable(disableCode);
+      setDisableCode('');
+      showToast('2FA desativado.', 'success');
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <SectionLabel colors={colors}>Autenticação em duas etapas (2FA)</SectionLabel>
+      {!me && !error && <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 14 }}>Carregando...</div>}
+
+      {step === 'recovery' && recoveryCodes && (
+        <div style={{ border: `1px solid ${colors.amber}`, background: `${colors.amber}14`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: colors.textPrimary, marginBottom: 6 }}>2FA ativado! Guarde estes códigos de recuperação:</div>
+          <div style={{ fontSize: 11.5, color: colors.textSecondary, marginBottom: 8 }}>
+            Cada um funciona uma única vez, caso você perca o acesso ao app autenticador. Salve num lugar seguro — eles não aparecem de novo.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontFamily: 'monospace', fontSize: 12.5, color: colors.textPrimary, marginBottom: 10 }}>
+            {recoveryCodes.map((c) => <div key={c}>{c}</div>)}
+          </div>
+          <button type="button" onClick={handleFinishSetup} style={{ border: 'none', background: colors.primary, color: '#fff', borderRadius: 8, padding: '7px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
+            Já salvei, entendi
+          </button>
+        </div>
+      )}
+
+      {step === 'setup' && setupData && (
+        <form onSubmit={handleConfirmEnable} style={{ border: `1px solid ${colors.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>
+            <img src={setupData.qrDataUrl} alt="QR code" width={140} height={140} style={{ borderRadius: 8, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <div style={{ fontSize: 12.5, color: colors.textSecondary, marginBottom: 6 }}>
+                Escaneie com Google Authenticator, Authy ou similar. Não consegue escanear? Digite manualmente:
+              </div>
+              <div style={{ fontFamily: 'monospace', fontSize: 12, background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '5px 8px', wordBreak: 'break-all' }}>
+                {setupData.secret}
+              </div>
+            </div>
+          </div>
+          <Field colors={colors} label="Código gerado pelo app, pra confirmar">
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" autoFocus style={{ ...inputStyle(colors), fontFamily: 'monospace', letterSpacing: '.08em' }} />
+          </Field>
+          {error && <div style={{ color: colors.red, fontSize: 13, marginBottom: 10 }}>{error}</div>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="submit" disabled={busy} style={{ border: 'none', background: colors.primary, color: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.7 : 1 }}>
+              {busy ? 'Confirmando...' : 'Ativar 2FA'}
+            </button>
+            <button type="button" onClick={() => { setStep('idle'); setSetupData(null); setError(''); }} style={{ border: `1px solid ${colors.border}`, background: 'transparent', color: colors.textSecondary, borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
+
+      {step === 'idle' && me && (
+        <>
+          {me.totpEnabled ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 13, color: colors.green, fontWeight: 700 }}>
+                <Icon paths={ICONS.shield} size={14} strokeWidth={2} /> 2FA ativado na sua conta
+              </div>
+              <form onSubmit={handleDisable} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 14 }}>
+                <div style={{ flex: 1, minWidth: 160, marginBottom: 0 }}>
+                  <Field colors={colors} label="Código atual (pra desativar)">
+                    <input value={disableCode} onChange={(e) => setDisableCode(e.target.value)} placeholder="123456" style={{ ...inputStyle(colors), fontFamily: 'monospace' }} />
+                  </Field>
+                </div>
+                <button type="submit" disabled={busy || !disableCode} style={{ border: `1px solid ${colors.red}`, background: 'transparent', color: colors.red, borderRadius: 8, padding: '9px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', opacity: (busy || !disableCode) ? 0.5 : 1, marginBottom: 14 }}>
+                  Desativar 2FA
+                </button>
+              </form>
+            </>
+          ) : (
+            <button type="button" onClick={handleStartSetup} disabled={busy} style={{ border: 'none', background: colors.primary, color: '#fff', borderRadius: 9, padding: '9px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', marginBottom: 14 }}>
+              {busy ? 'Gerando...' : 'Ativar 2FA'}
+            </button>
+          )}
+          {error && <div style={{ color: colors.red, fontSize: 13, marginBottom: 10 }}>{error}</div>}
+        </>
+      )}
+    </>
+  );
+}
+
 const AUDIT_PAGE_SIZE = 20;
 
 function SecurityTab({ colors, form, setForm }) {
@@ -220,6 +402,8 @@ function SecurityTab({ colors, form, setForm }) {
 
   return (
     <>
+      <TwoFactorSection colors={colors} />
+
       <SectionLabel colors={colors}>Bloqueio de login por tentativas</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         <Field colors={colors} label="Tentativas até bloquear">
@@ -393,6 +577,8 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
     loginMaxAttempts: settings.loginMaxAttempts || '5',
     loginAttemptWindowMinutes: settings.loginAttemptWindowMinutes || '15',
     loginLockoutMinutes: settings.loginLockoutMinutes || '15',
+    heartbeatEnabled: settings.heartbeatEnabled === 'true',
+    heartbeatFrequencyHours: settings.heartbeatFrequencyHours || '24',
     logoFile: null,
   });
   const [saving, setSaving] = useState(false);
