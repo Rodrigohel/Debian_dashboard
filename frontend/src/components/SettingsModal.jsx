@@ -76,8 +76,8 @@ function GeneralTab({ colors, form, setForm }) {
       </Field>
 
       <SectionLabel colors={colors}>Rede</SectionLabel>
-      <Field colors={colors} label="Prefixo /24 usado pelo 'Escanear rede'" hint="Formato: 192.168.1 (sem o último número do IP).">
-        <input value={form.networkBase} onChange={(e) => setForm({ ...form, networkBase: e.target.value })} placeholder="192.168.1" style={inputStyle(colors)} />
+      <Field colors={colors} label="Prefixo(s) /24 usado(s) pelo 'Escanear rede'" hint="Formato: 192.168.1 (sem o último número do IP). Rede com VLANs/sub-redes separadas? Coloque vários separados por vírgula — o botão escaneia todos de uma vez (até 10). Ex.: 192.168.1,192.168.20,10.1.0">
+        <input value={form.networkBase} onChange={(e) => setForm({ ...form, networkBase: e.target.value })} placeholder="192.168.1, 192.168.20" style={inputStyle(colors)} />
       </Field>
       <Field colors={colors} label="Reter histórico do gráfico de rede por (horas)" hint="168h = 7 dias. Não afeta o histórico de queda/recuperação por dispositivo, que fica guardado sem limite de tempo.">
         <input type="number" min={1} value={form.networkHistoryRetentionHours} onChange={(e) => setForm({ ...form, networkHistoryRetentionHours: e.target.value })} style={inputStyle(colors)} />

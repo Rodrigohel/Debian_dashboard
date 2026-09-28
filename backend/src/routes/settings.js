@@ -72,11 +72,14 @@ settingsRouter.put('/', (req, res) => {
   }
 
   if (networkBase !== undefined) {
-    const value = String(networkBase).trim();
-    if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value)) {
-      return res.status(400).json({ error: 'Prefixo de rede inválido — use o formato 192.168.1 (3 primeiros números do IP).' });
+    // Aceita vários prefixos separados por vírgula (ex.: "192.168.1,192.168.20")
+    // pra quem tem a rede segmentada em VLANs/sub-redes diferentes — o
+    // "Escanear rede" varre todos de uma vez (ver scanService).
+    const parts = String(networkBase).split(',').map((p) => p.trim()).filter(Boolean);
+    if (parts.length === 0 || !parts.every((p) => /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(p))) {
+      return res.status(400).json({ error: 'Prefixo de rede inválido — use o formato 192.168.1 (3 primeiros números do IP), ou vários separados por vírgula: 192.168.1,192.168.20' });
     }
-    updates.networkBase = value;
+    updates.networkBase = parts.join(',');
   }
 
   if (networkHistoryRetentionHours !== undefined) {

@@ -268,10 +268,15 @@ Três formas de popular a lista, pode combinar as três:
 
 1. **Varredura de rede** (mais rápido para começar): na tela de
    Dispositivos, clique em **"Escanear rede"** — o backend faz um ping
-   sweep no prefixo configurado em `NETWORK_BASE` (padrão `192.168.1`, de
-   `.1` a `.254`), cadastra automaticamente todo IP que responder e ainda
-   não estiver na lista, e já roda a identificação (MAC/fabricante/modelo)
-   nesses novos. Depois é só abrir cada um e ajustar nome/tipo/local.
+   sweep no(s) prefixo(s) configurado(s) em `NETWORK_BASE`/Configurações →
+   Geral (padrão `192.168.1`, de `.1` a `.254`), cadastra automaticamente
+   todo IP que responder e ainda não estiver na lista, e já roda a
+   identificação (MAC/fabricante/modelo) nesses novos. Depois é só abrir
+   cada um e ajustar nome/tipo/local. **Rede com VLANs/sub-redes
+   separadas?** Configure vários prefixos separados por vírgula (ex.:
+   `192.168.1,192.168.20,10.1.0`, até 10) — o botão varre todos numa
+   tacada só. Só funciona pra sub-redes que o próprio servidor já alcança
+   (roteamento entre VLANs é configuração de rede, não do painel).
 2. **Importação em massa por CSV**: preencha uma planilha com as colunas
    `ip,name,type,location,ports,notes` (veja
    `backend/samples/devices.sample.csv` como modelo — os tipos aceitos são

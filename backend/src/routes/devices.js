@@ -197,6 +197,10 @@ devicesRouter.post('/scan', requireAdmin, async (req, res) => {
   if (end - start > 512) {
     return res.status(400).json({ error: 'Faixa de varredura grande demais (máximo 512 IPs por vez).' });
   }
+  const prefixCount = String(base).split(',').filter((p) => p.trim()).length;
+  if (prefixCount > 10) {
+    return res.status(400).json({ error: 'Máximo de 10 prefixos de rede por varredura.' });
+  }
   try {
     const result = await scanNetwork({ base, start, end });
     res.json(result);
