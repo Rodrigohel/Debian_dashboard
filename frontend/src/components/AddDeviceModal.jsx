@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { TYPE_META } from './Icon.jsx';
 
 export default function AddDeviceModal({ colors, onClose, onCreate }) {
-  const [form, setForm] = useState({ ip: '', name: '', type: 'outro', typeLabel: '', location: '', ports: '', notes: '', username: '', password: '' });
+  const [form, setForm] = useState({
+    ip: '', name: '', type: 'outro', typeLabel: '', location: '', ports: '', notes: '',
+    username: '', password: '', sipUsername: '', sipPassword: '',
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -29,29 +32,39 @@ export default function AddDeviceModal({ colors, onClose, onCreate }) {
 
         <div style={{ display: 'grid', gap: 12, marginBottom: 14 }}>
           <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Tipo</label>
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} autoFocus style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }}>
+              {Object.entries(TYPE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
+            </select>
+          </div>
+          <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>IP *</label>
-            <input required value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.1.50" autoFocus style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
+            <input required value={form.ip} onChange={(e) => setForm({ ...form, ip: e.target.value })} placeholder="192.168.1.50" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Nome</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Câmera Entrada" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Tipo</label>
-              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }}>
-                {Object.entries(TYPE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Local</label>
-              <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex.: Bloco A" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
-            </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Local</label>
+            <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex.: Bloco A" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
           </div>
           {form.type === 'outro' && (
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Descreva o tipo</label>
               <input value={form.typeLabel} onChange={(e) => setForm({ ...form, typeLabel: e.target.value })} placeholder="Ex.: Sensor de porta" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
+            </div>
+          )}
+          {form.type === 'interfone' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Usuário SIP (opcional)</label>
+                <input value={form.sipUsername} onChange={(e) => setForm({ ...form, sipUsername: e.target.value })} placeholder="ramal ou usuário de registro" autoComplete="off" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Senha SIP (opcional)</label>
+                <input type="password" value={form.sipPassword} onChange={(e) => setForm({ ...form, sipPassword: e.target.value })} placeholder="••••••" autoComplete="off" style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }} />
+              </div>
             </div>
           )}
           <div>
