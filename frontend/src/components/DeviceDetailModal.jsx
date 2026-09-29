@@ -153,7 +153,7 @@ export default function DeviceDetailModal({
       <div
         onClick={(e) => e.stopPropagation()}
         className="modal-card"
-        style={{ width: '100%', maxWidth: 520, background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '24px 26px', boxShadow: colors.shadow, overflowY: 'auto', position: 'relative' }}
+        style={{ width: '100%', maxWidth: 680, background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '24px 26px', boxShadow: colors.shadow, overflowY: 'auto', position: 'relative' }}
       >
         <button onClick={onClose} aria-label="Fechar" style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'transparent', color: colors.textTertiary, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
 
@@ -403,7 +403,7 @@ export default function DeviceDetailModal({
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+        <div className="field-grid-3" style={{ marginBottom: 14 }}>
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Tipo</label>
             <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} style={{ width: '100%', padding: '8px 10px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13 }}>
