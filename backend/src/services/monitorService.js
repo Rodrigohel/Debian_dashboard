@@ -68,8 +68,19 @@ async function checkDevice(device, settings, arpTable) {
       updateMacStmt.run({ id: device.id, mac, vendor });
     }
   } else {
-    consecutiveFails += 1;
-    status = consecutiveFails >= settings.offlineThresholdFails ? 'offline' : device.status;
+    // Ping falhou, mas isso não é necessariamente "caiu": muitos ramais SIP e
+    // interfones despriorizam resposta a ICMP (principalmente com CPU ocupada
+    // numa chamada) mesmo continuando registrados e com a interface web no ar.
+    // Se o dispositivo tem porta TCP configurada e ela responde, confia nela
+    // em vez de derrubar pra offline por causa só do ping.
+    const tcpOk = device.ports.length > 0 ? await checkAnyTcpPort(device.ip, device.ports, timeoutMs) : null;
+    if (tcpOk === true) {
+      consecutiveFails = 0;
+      status = 'online';
+    } else {
+      consecutiveFails += 1;
+      status = consecutiveFails >= settings.offlineThresholdFails ? 'offline' : device.status;
+    }
   }
 
   const previousStatus = device.status;
