@@ -31,7 +31,7 @@ const LEGEND = [
 // coluna é uma semana, cada célula um dia — dá pra enxergar de longe padrões
 // que um número sozinho esconde (ex.: um NVR que sempre degrada de
 // madrugada, ou uma queda isolada há 3 semanas que ainda pesa na média).
-export default function UptimeHeatmap({ colors, deviceId }) {
+export default function UptimeHeatmap({ colors, deviceId, noMarginBottom }) {
   const [days, setDays] = useState(90);
   const [data, setData] = useState(null);
   const [hover, setHover] = useState(null);
@@ -61,7 +61,7 @@ export default function UptimeHeatmap({ colors, deviceId }) {
   const cell = 11, gap = 3;
 
   return (
-    <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
+    <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: noMarginBottom ? 0 : 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em' }}>Disponibilidade por dia</div>
         <div style={{ display: 'flex', gap: 4 }}>

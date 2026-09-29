@@ -153,7 +153,7 @@ export default function DeviceDetailModal({
       <div
         onClick={(e) => e.stopPropagation()}
         className="modal-card"
-        style={{ width: '100%', maxWidth: 680, background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '24px 26px', boxShadow: colors.shadow, overflowY: 'auto', position: 'relative' }}
+        style={{ width: '100%', maxWidth: 760, background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '24px 26px', boxShadow: colors.shadow, overflowY: 'auto', position: 'relative' }}
       >
         <button onClick={onClose} aria-label="Fechar" style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'transparent', color: colors.textTertiary, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
 
@@ -229,187 +229,194 @@ export default function DeviceDetailModal({
           </div>
         )}
 
-        <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Latência recente</div>
-          <Sparkline colors={colors} checks={device.recentChecks} />
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Tipo de equipamento</label>
+          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} style={{ width: '100%', maxWidth: 280, padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }}>
+            {Object.entries(TYPE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
+          </select>
+          <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: 5 }}>Define quais campos aparecem abaixo (ex.: credenciais SIP só pra Interfone).</div>
         </div>
 
-        <UptimeHeatmap colors={colors} deviceId={device.id} />
-
-        <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em' }}>Identificação</div>
-            <button
-              type="button"
-              onClick={() => onIdentifyNow(device.id)}
-              disabled={identifying}
-              style={{ border: 'none', background: 'transparent', color: colors.primary, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0 }}
-            >
-              <Icon paths={ICONS.search} size={13} strokeWidth={2.2} /> {identifying ? 'Identificando...' : 'Identificar agora'}
-            </button>
+        <div className="field-grid-2" style={{ alignItems: 'start', marginBottom: 18 }}>
+          <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Latência recente</div>
+            <Sparkline colors={colors} checks={device.recentChecks} />
           </div>
-          <div className="field-grid-3">
-            <div>
-              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>MAC</label>
-              <input value={form.mac} onChange={(e) => setForm({ ...form, mac: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Fabricante</label>
-              <input value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Modelo</label>
-              <input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }} />
-            </div>
-          </div>
-          <div style={{ marginTop: 10 }}>
-            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Nº de série</label>
-            <input value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }} />
-          </div>
-          {hints.length > 0 && (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {hints.map((hint, i) => (
-                <div key={i} style={{ fontSize: 11.5, color: colors.textTertiary }}>{hint}</div>
-              ))}
-            </div>
-          )}
+          <UptimeHeatmap colors={colors} deviceId={device.id} noMarginBottom />
         </div>
 
-        <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em' }}>Acesso do equipamento</div>
-            <a
-              href={webUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: colors.primary, textDecoration: 'none' }}
-            >
-              <Icon paths={ICONS.externalLink} size={13} strokeWidth={2.2} /> Abrir interface web
-            </a>
-          </div>
-          <div className="field-grid-2">
-            <div style={{ minWidth: 0 }}>
-              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Usuário</label>
-              <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
-                <input
-                  value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value })}
-                  placeholder="admin"
-                  autoComplete="off"
-                  style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(form.username, 'Usuário')}
-                  title="Copiar usuário"
-                  style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                >
-                  <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
-                </button>
-              </div>
+        <div className="field-grid-2" style={{ alignItems: 'start', marginBottom: 18 }}>
+          <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em' }}>Identificação</div>
+              <button
+                type="button"
+                onClick={() => onIdentifyNow(device.id)}
+                disabled={identifying}
+                style={{ border: 'none', background: 'transparent', color: colors.primary, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0 }}
+              >
+                <Icon paths={ICONS.search} size={13} strokeWidth={2.2} /> {identifying ? 'Identificando...' : 'Identificar agora'}
+              </button>
             </div>
-            <div style={{ minWidth: 0 }}>
-              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Senha</label>
-              <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
-                <input
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  placeholder="••••••"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="off"
-                  style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                  style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                >
-                  <Icon paths={showPassword ? ICONS.eyeOff : ICONS.eye} size={13} strokeWidth={2} color={colors.textSecondary} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(form.password, 'Senha')}
-                  title="Copiar senha"
-                  style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                >
-                  <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
-                </button>
-              </div>
-            </div>
-          </div>
-          <div style={{ marginTop: 8, fontSize: 11, color: colors.textTertiary }}>
-            Guardado de forma criptografada — visível apenas nesta tela.
-          </div>
-        </div>
-
-        {form.type === 'interfone' && (
-          <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Credenciais SIP</div>
             <div className="field-grid-2">
-              <div style={{ minWidth: 0 }}>
-                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Usuário SIP</label>
-                <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
-                  <input
-                    value={form.sipUsername}
-                    onChange={(e) => setForm({ ...form, sipUsername: e.target.value })}
-                    placeholder="ramal ou usuário de registro"
-                    autoComplete="off"
-                    style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(form.sipUsername, 'Usuário SIP')}
-                    title="Copiar usuário SIP"
-                    style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
-                  </button>
-                </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>MAC</label>
+                <input value={form.mac} onChange={(e) => setForm({ ...form, mac: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }} />
               </div>
-              <div style={{ minWidth: 0 }}>
-                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Senha SIP</label>
-                <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
-                  <input
-                    value={form.sipPassword}
-                    onChange={(e) => setForm({ ...form, sipPassword: e.target.value })}
-                    placeholder="••••••"
-                    type={showSipPassword ? 'text' : 'password'}
-                    autoComplete="off"
-                    style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSipPassword((v) => !v)}
-                    title={showSipPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                    style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Icon paths={showSipPassword ? ICONS.eyeOff : ICONS.eye} size={13} strokeWidth={2} color={colors.textSecondary} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(form.sipPassword, 'Senha SIP')}
-                    title="Copiar senha SIP"
-                    style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
-                  </button>
-                </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Fabricante</label>
+                <input value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Modelo</label>
+                <input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Nº de série</label>
+                <input value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }} />
               </div>
             </div>
-            <div style={{ marginTop: 8, fontSize: 11, color: colors.textTertiary }}>
-              Guardado de forma criptografada — visível apenas nesta tela.
-            </div>
+            {hints.length > 0 && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {hints.map((hint, i) => (
+                  <div key={i} style={{ fontSize: 11.5, color: colors.textTertiary }}>{hint}</div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em' }}>Acesso do equipamento</div>
+                <a
+                  href={webUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: colors.primary, textDecoration: 'none' }}
+                >
+                  <Icon paths={ICONS.externalLink} size={13} strokeWidth={2.2} /> Abrir interface web
+                </a>
+              </div>
+              <div className="field-grid-2">
+                <div style={{ minWidth: 0 }}>
+                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Usuário</label>
+                  <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
+                    <input
+                      value={form.username}
+                      onChange={(e) => setForm({ ...form, username: e.target.value })}
+                      placeholder="admin"
+                      autoComplete="off"
+                      style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(form.username, 'Usuário')}
+                      title="Copiar usuário"
+                      style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    >
+                      <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
+                    </button>
+                  </div>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Senha</label>
+                  <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
+                    <input
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      placeholder="••••••"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="off"
+                      style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    >
+                      <Icon paths={showPassword ? ICONS.eyeOff : ICONS.eye} size={13} strokeWidth={2} color={colors.textSecondary} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(form.password, 'Senha')}
+                      title="Copiar senha"
+                      style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    >
+                      <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: colors.textTertiary }}>
+                Guardado de forma criptografada — visível apenas nesta tela.
+              </div>
+            </div>
+
+            {form.type === 'interfone' && (
+              <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Credenciais SIP</div>
+                <div className="field-grid-2">
+                  <div style={{ minWidth: 0 }}>
+                    <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Usuário SIP</label>
+                    <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
+                      <input
+                        value={form.sipUsername}
+                        onChange={(e) => setForm({ ...form, sipUsername: e.target.value })}
+                        placeholder="ramal ou usuário de registro"
+                        autoComplete="off"
+                        style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(form.sipUsername, 'Usuário SIP')}
+                        title="Copiar usuário SIP"
+                        style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Senha SIP</label>
+                    <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
+                      <input
+                        value={form.sipPassword}
+                        onChange={(e) => setForm({ ...form, sipPassword: e.target.value })}
+                        placeholder="••••••"
+                        type={showSipPassword ? 'text' : 'password'}
+                        autoComplete="off"
+                        style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSipPassword((v) => !v)}
+                        title={showSipPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                        style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <Icon paths={showSipPassword ? ICONS.eyeOff : ICONS.eye} size={13} strokeWidth={2} color={colors.textSecondary} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(form.sipPassword, 'Senha SIP')}
+                        title="Copiar senha SIP"
+                        style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 8, fontSize: 11, color: colors.textTertiary }}>
+                  Guardado de forma criptografada — visível apenas nesta tela.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="field-grid-3" style={{ marginBottom: 14 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Tipo</label>
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} style={{ width: '100%', padding: '8px 10px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13 }}>
-              {Object.entries(TYPE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
-            </select>
-          </div>
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Nome</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={{ width: '100%', padding: '8px 10px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13 }} />
