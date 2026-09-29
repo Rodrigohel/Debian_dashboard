@@ -229,23 +229,33 @@ export default function DeviceDetailModal({
           </div>
         )}
 
-        <div style={{ marginBottom: 18 }}>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>Tipo de equipamento</label>
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} style={{ width: '100%', maxWidth: 280, padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5 }}>
-            {Object.entries(TYPE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
-          </select>
-          <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: 5 }}>Define quais campos aparecem abaixo (ex.: credenciais SIP só pra Interfone).</div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+          background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 18,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 10, background: colors.bgCard, border: `1px solid ${colors.border}`, flexShrink: 0 }}>
+            <Icon paths={(TYPE_META[form.type] || TYPE_META.outro).icon} size={18} color={colors.primary} strokeWidth={2} />
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>Tipo de equipamento</label>
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} style={{ width: '100%', maxWidth: 320, padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5, fontWeight: 600 }}>
+              {Object.entries(TYPE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
+            </select>
+          </div>
+          <div style={{ fontSize: 11, color: colors.textTertiary, maxWidth: 240 }}>Define quais campos aparecem abaixo (ex.: credenciais SIP só pra Interfone).</div>
         </div>
 
-        <div className="field-grid-2" style={{ alignItems: 'start', marginBottom: 18 }}>
-          <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px' }}>
+        <div className="field-grid-2" style={{ marginBottom: 18 }}>
+          <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Latência recente</div>
-            <Sparkline colors={colors} checks={device.recentChecks} />
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+              <Sparkline colors={colors} checks={device.recentChecks} />
+            </div>
           </div>
           <UptimeHeatmap colors={colors} deviceId={device.id} noMarginBottom />
         </div>
 
-        <div className="field-grid-2" style={{ alignItems: 'start', marginBottom: 18 }}>
+        <div className="field-grid-2" style={{ marginBottom: 18 }}>
           <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em' }}>Identificação</div>
