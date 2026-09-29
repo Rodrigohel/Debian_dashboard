@@ -184,6 +184,13 @@ for (const [column, ddl] of [
   ['floor_y', 'ALTER TABLE devices ADD COLUMN floor_y REAL'],
   ['floor_id', 'ALTER TABLE devices ADD COLUMN floor_id INTEGER REFERENCES floors(id)'],
   ['type_label', "ALTER TABLE devices ADD COLUMN type_label TEXT NOT NULL DEFAULT ''"],
+  ['serial_number', "ALTER TABLE devices ADD COLUMN serial_number TEXT NOT NULL DEFAULT ''"],
+  // Credenciais SIP (usuário/senha de registro) — só usadas/exibidas quando
+  // o dispositivo é do tipo "interfone", mas a coluna existe pra qualquer
+  // tipo, sem custo. Senha criptografada do mesmo jeito que a senha de
+  // acesso web (ver cryptoService).
+  ['sip_username', "ALTER TABLE devices ADD COLUMN sip_username TEXT NOT NULL DEFAULT ''"],
+  ['sip_password_enc', "ALTER TABLE devices ADD COLUMN sip_password_enc TEXT NOT NULL DEFAULT ''"],
 ]) {
   if (!deviceColumns.includes(column)) db.exec(ddl);
 }

@@ -121,12 +121,14 @@ export default function DeviceDetailModal({
   const [form, setForm] = useState({
     name: device.name, type: device.type, typeLabel: device.typeLabel || '', location: device.location,
     ports: device.ports.join(', '), notes: device.notes, enabled: device.enabled,
-    mac: device.mac || '', vendor: device.vendor || '', model: device.model || '',
+    mac: device.mac || '', vendor: device.vendor || '', model: device.model || '', serialNumber: device.serialNumber || '',
     username: device.username || '', password: device.password || '',
+    sipUsername: device.sipUsername || '', sipPassword: device.sipPassword || '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showSipPassword, setShowSipPassword] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [showMaintenancePicker, setShowMaintenancePicker] = useState(false);
   const statusMeta = STATUS_META[device.status] || STATUS_META.unknown;
@@ -139,9 +141,9 @@ export default function DeviceDetailModal({
     setError('');
     try {
       await onSave(device.id, { ...form, ip: device.ip });
+      onClose();
     } catch (err) {
       setError(err.message);
-    } finally {
       setSaving(false);
     }
   }
@@ -260,6 +262,10 @@ export default function DeviceDetailModal({
               <input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }} />
             </div>
           </div>
+          <div style={{ marginTop: 10 }}>
+            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Nº de série</label>
+            <input value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })} placeholder="—" style={{ width: '100%', padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }} />
+          </div>
           {hints.length > 0 && (
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
               {hints.map((hint, i) => (
@@ -336,6 +342,66 @@ export default function DeviceDetailModal({
             Guardado de forma criptografada — visível apenas nesta tela.
           </div>
         </div>
+
+        {form.type === 'interfone' && (
+          <div style={{ background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 18 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>Credenciais SIP</div>
+            <div className="field-grid-2">
+              <div style={{ minWidth: 0 }}>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Usuário SIP</label>
+                <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
+                  <input
+                    value={form.sipUsername}
+                    onChange={(e) => setForm({ ...form, sipUsername: e.target.value })}
+                    placeholder="ramal ou usuário de registro"
+                    autoComplete="off"
+                    style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(form.sipUsername, 'Usuário SIP')}
+                    title="Copiar usuário SIP"
+                    style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  >
+                    <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
+                  </button>
+                </div>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: colors.textSecondary, marginBottom: 4 }}>Senha SIP</label>
+                <div style={{ display: 'flex', gap: 4, minWidth: 0 }}>
+                  <input
+                    value={form.sipPassword}
+                    onChange={(e) => setForm({ ...form, sipPassword: e.target.value })}
+                    placeholder="••••••"
+                    type={showSipPassword ? 'text' : 'password'}
+                    autoComplete="off"
+                    style={{ flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, border: `1px solid ${colors.border}`, fontSize: 12.5, fontFamily: 'monospace' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSipPassword((v) => !v)}
+                    title={showSipPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  >
+                    <Icon paths={showSipPassword ? ICONS.eyeOff : ICONS.eye} size={13} strokeWidth={2} color={colors.textSecondary} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(form.sipPassword, 'Senha SIP')}
+                    title="Copiar senha SIP"
+                    style={{ border: `1px solid ${colors.border}`, background: colors.bgCard, borderRadius: 8, padding: '0 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  >
+                    <Icon paths={ICONS.copy} size={13} strokeWidth={2} color={colors.textSecondary} />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 8, fontSize: 11, color: colors.textTertiary }}>
+              Guardado de forma criptografada — visível apenas nesta tela.
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           <div>

@@ -37,7 +37,7 @@ devicesRouter.get('/summary', (req, res) => {
 devicesRouter.get('/export', (req, res) => {
   const devices = listDevices();
   const rows = devices.map((d) => ({ ...d, ports: d.ports.join(';') }));
-  const csv = toCsv(rows, ['ip', 'name', 'type', 'location', 'ports', 'mac', 'vendor', 'model', 'notes']);
+  const csv = toCsv(rows, ['ip', 'name', 'type', 'location', 'ports', 'mac', 'vendor', 'model', 'serialNumber', 'notes']);
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="dispositivos.csv"');
   res.send(csv);
@@ -174,7 +174,7 @@ devicesRouter.post('/import', requireAdmin, upload.single('file'), (req, res) =>
   if (!req.file) return res.status(400).json({ error: 'Envie um arquivo CSV.' });
   const rows = parseCsv(req.file.buffer.toString('utf8'));
   if (rows.length === 0) {
-    return res.status(400).json({ error: 'CSV vazio ou sem cabeçalho reconhecido (ip,name,type,location,ports,notes — mac/vendor/model são opcionais e normalmente descobertos automaticamente).' });
+    return res.status(400).json({ error: 'CSV vazio ou sem cabeçalho reconhecido (ip,name,type,location,ports,notes — mac/vendor/model/serialnumber são opcionais e normalmente descobertos automaticamente ou digitados na tela).' });
   }
   let processed = 0;
   const errors = [];

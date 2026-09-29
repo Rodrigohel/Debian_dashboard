@@ -110,6 +110,11 @@ público opcional.
   nem na listagem, e só é descriptografada na tela de detalhe de UM
   dispositivo por vez. Tem botão de copiar, mostrar/ocultar e um atalho
   "Abrir interface web" que já abre o IP do equipamento em nova aba.
+- **Número de série**: campo próprio no detalhe do dispositivo, útil pra
+  controle de garantia/patrimônio.
+- **Credenciais SIP**: quando o tipo do dispositivo é "Interfone", aparece
+  uma seção própria de usuário/senha de registro SIP no detalhe — mesma
+  proteção (criptografada, só visível ali) do acesso web acima.
 - **Favoritos**: marque os dispositivos mais importantes com a estrela (na
   tabela ou no detalhe) e filtre só por eles — útil com ~230 IPs na lista.
 - **Uptime por dispositivo**: cada detalhe mostra o **% de tempo no ar nos
