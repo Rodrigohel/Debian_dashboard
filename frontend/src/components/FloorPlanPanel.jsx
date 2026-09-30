@@ -54,9 +54,21 @@ function FloorButton({ colors, floor, count, statusColor, active, isAdmin, onSel
   );
 }
 
+// Tipos com ícone próprio em TYPE_META mostram esse ícone no pino em vez do
+// pontinho genérico — "outro" fica de fora de propósito (é literalmente o
+// tipo "não classificado", então mantém o pontinho de sempre). Dispositivo
+// cadastrado antes dessa mudança continua com o pontinho até alguém definir
+// um tipo específico — não tem migração, é automático a partir do campo
+// "Tipo de equipamento" que já existe.
+const typeIcon = (device) => (device.type !== 'outro' ? TYPE_META[device.type] : null);
+
 function Pin({ colors, device, style, editable, dragging, onPointerDown, onRemove, onClick }) {
   const color = colors[STATUS_COLOR[device.status]] || colors.gray;
   const inMaintenance = device.maintenanceUntil && new Date(device.maintenanceUntil) > new Date();
+  const iconMeta = typeIcon(device);
+  const title = `${device.name} (${device.ip}) — ${device.status}`;
+  const shadow = dragging ? '0 2px 10px rgba(0,0,0,.5)' : '0 1px 4px rgba(0,0,0,.35)';
+  const outline = editable ? `2px dashed ${colors.primary}55` : 'none';
   return (
     <div
       style={{ position: 'absolute', transform: 'translate(-50%,-50%)', zIndex: dragging ? 30 : 10, ...style }}
@@ -64,19 +76,39 @@ function Pin({ colors, device, style, editable, dragging, onPointerDown, onRemov
       onClick={editable ? undefined : onClick}
       className="floorplan-pin"
     >
-      <div
-        title={`${device.name} (${device.ip}) — ${device.status}`}
-        style={{
-          width: 18, height: 18, borderRadius: 99, background: color, border: '2.5px solid #fff',
-          boxShadow: dragging ? '0 2px 10px rgba(0,0,0,.5)' : '0 1px 4px rgba(0,0,0,.35)',
-          cursor: editable ? 'grab' : 'pointer',
-          animation: device.status === 'offline' ? 'pulseDot 1.4s ease-in-out infinite' : 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          outline: editable ? `2px dashed ${colors.primary}55` : 'none', outlineOffset: 2,
-        }}
-      >
-        {inMaintenance && <Icon paths={ICONS.wrench} size={9} strokeWidth={3} color="#fff" />}
-      </div>
+      {iconMeta ? (
+        <div
+          title={title}
+          style={{
+            width: 26, height: 26, borderRadius: 99, background: '#fff', border: `2.5px solid ${color}`,
+            boxShadow: shadow,
+            cursor: editable ? 'grab' : 'pointer',
+            // Mesma lógica de status do pontinho: vermelho pisca (queda,
+            // precisa chamar atenção); verde ganha um pulso bem mais sutil só
+            // pra indicar "monitorado e vivo" sem poluir a planta.
+            animation: device.status === 'offline' ? 'pulseDot 1.4s ease-in-out infinite'
+              : device.status === 'online' ? 'pulseSoft 2.6s ease-in-out infinite' : 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            outline, outlineOffset: 2,
+          }}
+        >
+          <Icon paths={inMaintenance ? ICONS.wrench : iconMeta.icon} size={13} strokeWidth={2.4} color={color} />
+        </div>
+      ) : (
+        <div
+          title={title}
+          style={{
+            width: 18, height: 18, borderRadius: 99, background: color, border: '2.5px solid #fff',
+            boxShadow: shadow,
+            cursor: editable ? 'grab' : 'pointer',
+            animation: device.status === 'offline' ? 'pulseDot 1.4s ease-in-out infinite' : 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            outline, outlineOffset: 2,
+          }}
+        >
+          {inMaintenance && <Icon paths={ICONS.wrench} size={9} strokeWidth={3} color="#fff" />}
+        </div>
+      )}
       <div className="floorplan-pin-label" style={{
         position: 'absolute', top: '120%', left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap',
         background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 8, padding: '3px 8px',
