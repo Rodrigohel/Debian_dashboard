@@ -212,6 +212,16 @@ for (const [column, ddl] of [
   if (!userColumns.includes(column)) db.exec(ddl);
 }
 
+// Ligação Twilio pra equipamento crítico (ver alertsService/twilioService):
+// controle de reenvio próprio, independente do lembrete do Telegram.
+const alertColumns = db.prepare('PRAGMA table_info(alerts)').all().map((c) => c.name);
+for (const [column, ddl] of [
+  ['last_call_at', 'ALTER TABLE alerts ADD COLUMN last_call_at TEXT'],
+  ['call_active', 'ALTER TABLE alerts ADD COLUMN call_active INTEGER NOT NULL DEFAULT 0'],
+]) {
+  if (!alertColumns.includes(column)) db.exec(ddl);
+}
+
 // Migração única: a primeira versão da planta baixa usava uma imagem só
 // (guardada em settings.floorPlanUrl) pra todos os dispositivos. Ao migrar
 // pra múltiplos pavimentos, se já existir aquela imagem antiga e nenhum

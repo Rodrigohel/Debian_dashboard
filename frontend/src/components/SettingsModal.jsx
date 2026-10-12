@@ -83,7 +83,7 @@ function GeneralTab({ colors, form, setForm }) {
   );
 }
 
-function TelegramTab({ colors, form, setForm, onTest, testing }) {
+function TelegramTab({ colors, form, setForm, onTest, testing, onTestCall, testingCall }) {
   return (
     <>
       <SectionLabel colors={colors}>Notificação via Telegram (opcional)</SectionLabel>
@@ -117,6 +117,42 @@ function TelegramTab({ colors, form, setForm, onTest, testing }) {
       <div style={{ fontSize: 11.5, color: colors.textTertiary, marginTop: -6, marginBottom: 14 }}>
         Enquanto um alerta continua ativo (equipamento não voltou), o painel reenvia um lembrete "ainda ativo" nesse intervalo — 0 manda só quando fica ativo e quando resolve, sem repetir. Marque o dispositivo como crítico no detalhe dele pra ele passar a usar o intervalo "crítico" em vez do "normal".
       </div>
+
+      <SectionLabel colors={colors}>📞 Ligação (Twilio) — opcional, além do Telegram</SectionLabel>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: colors.textSecondary, marginBottom: 12, cursor: 'pointer' }}>
+        <input type="checkbox" checked={form.twilioCallEnabled} onChange={(e) => setForm({ ...form, twilioCallEnabled: e.target.checked })} />
+        Ligar pro número abaixo quando um equipamento crítico ficar OFFLINE
+      </label>
+      <div style={{ fontSize: 11.5, color: colors.textTertiary, marginTop: -6, marginBottom: 12 }}>
+        Chamada de verdade pela rede telefônica (a pessoa não precisa instalar nada, só atender o celular normal) — não fala nada, só toca e desliga, pra chamar atenção mesmo se ninguém estiver olhando o Telegram. Nunca substitui a mensagem acima, só soma. Precisa de uma conta Twilio (twilio.com) com créditos.
+      </div>
+      <div className="field-grid-2">
+        <Field colors={colors} label="Account SID">
+          <input value={form.twilioAccountSid} onChange={(e) => setForm({ ...form, twilioAccountSid: e.target.value })} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
+        </Field>
+        <Field colors={colors} label="Auth Token">
+          <input type="password" value={form.twilioAuthToken} onChange={(e) => setForm({ ...form, twilioAuthToken: e.target.value })} style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
+        </Field>
+      </div>
+      <div className="field-grid-2">
+        <Field colors={colors} label="Número de origem (Twilio)" hint="Formato internacional. Ex.: +14155551234">
+          <input value={form.twilioFromNumber} onChange={(e) => setForm({ ...form, twilioFromNumber: e.target.value })} placeholder="+14155551234" style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
+        </Field>
+        <Field colors={colors} label="Número a ligar (crítico)" hint="Formato internacional. Ex.: +5511987654321">
+          <input value={form.twilioToNumberCritical} onChange={(e) => setForm({ ...form, twilioToNumberCritical: e.target.value })} placeholder="+5511987654321" style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
+        </Field>
+      </div>
+      <Field colors={colors} label="Ligar de novo a cada (min)" hint="Cadência própria, independente do lembrete do Telegram acima — 0 liga só uma vez, quando o equipamento crítico cai.">
+        <input type="number" min={0} value={form.twilioCallReminderIntervalMinutes} onChange={(e) => setForm({ ...form, twilioCallReminderIntervalMinutes: e.target.value })} style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
+      </Field>
+      <button
+        type="button"
+        onClick={onTestCall}
+        disabled={testingCall || !form.twilioAccountSid || !form.twilioAuthToken || !form.twilioFromNumber || !form.twilioToNumberCritical}
+        style={{ border: `1px solid ${colors.border}`, background: colors.bgCardAlt, color: colors.textPrimary, borderRadius: 9, padding: '8px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', marginBottom: 14, opacity: (!form.twilioAccountSid || !form.twilioAuthToken || !form.twilioFromNumber || !form.twilioToNumberCritical) ? 0.5 : 1 }}
+      >
+        {testingCall ? 'Ligando...' : 'Testar ligação'}
+      </button>
 
       <SectionLabel colors={colors}>Relatório executivo automático</SectionLabel>
       <Field colors={colors} label="Frequência de envio pelo Telegram" hint="Manda o mesmo PDF do botão 'Relatório executivo' sozinho, no bot/chat configurado acima — precisa dos dois campos preenchidos.">
@@ -586,6 +622,12 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
     telegramBotToken: settings.telegramBotToken || '',
     telegramChatId: settings.telegramChatId || '',
     telegramChatIdCritical: settings.telegramChatIdCritical || '',
+    twilioCallEnabled: settings.twilioCallEnabled === 'true',
+    twilioAccountSid: settings.twilioAccountSid || '',
+    twilioAuthToken: settings.twilioAuthToken || '',
+    twilioFromNumber: settings.twilioFromNumber || '',
+    twilioToNumberCritical: settings.twilioToNumberCritical || '',
+    twilioCallReminderIntervalMinutes: settings.twilioCallReminderIntervalMinutes || '30',
     executiveReportFrequency: settings.executiveReportFrequency || 'off',
     backupEnabled: settings.backupEnabled !== 'false',
     backupRetentionDays: settings.backupRetentionDays || '14',
@@ -598,6 +640,7 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
   });
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [testingCall, setTestingCall] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -631,6 +674,23 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
     }
   }
 
+  async function handleTestTwilio() {
+    setTestingCall(true);
+    setError('');
+    setMessage('');
+    try {
+      await api.testTwilio({
+        twilioAccountSid: form.twilioAccountSid, twilioAuthToken: form.twilioAuthToken,
+        twilioFromNumber: form.twilioFromNumber, twilioToNumberCritical: form.twilioToNumberCritical,
+      });
+      setMessage('Ligação de teste disparada — o telefone deve tocar em instantes.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setTestingCall(false);
+    }
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 1000 }}>
       <div onClick={(e) => e.stopPropagation()} className="modal-card" style={{ width: '100%', maxWidth: 540, background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '24px 26px', boxShadow: colors.shadow, overflowY: 'auto', position: 'relative' }}>
@@ -650,7 +710,7 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
         </div>
 
         {tab === 'general' && <GeneralTab colors={colors} form={form} setForm={setForm} />}
-        {tab === 'telegram' && <TelegramTab colors={colors} form={form} setForm={setForm} onTest={handleTestTelegram} testing={testing} />}
+        {tab === 'telegram' && <TelegramTab colors={colors} form={form} setForm={setForm} onTest={handleTestTelegram} testing={testing} onTestCall={handleTestTwilio} testingCall={testingCall} />}
         {tab === 'users' && <UsersTab colors={colors} currentUsername={currentUsername} />}
         {tab === 'security' && <SecurityTab colors={colors} form={form} setForm={setForm} />}
         {tab === 'backup' && <BackupTab colors={colors} form={form} setForm={setForm} />}

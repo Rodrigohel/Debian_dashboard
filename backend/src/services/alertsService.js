@@ -1,5 +1,6 @@
 import { db } from '../db/sqlite.js';
 import { sendTelegramMessage } from './telegramService.js';
+import { makeCriticalCall } from './twilioService.js';
 import { getSettings } from './settingsService.js';
 
 const upsertStmt = db.prepare(`
@@ -8,10 +9,12 @@ const upsertStmt = db.prepare(`
   ON CONFLICT(id) DO UPDATE SET status = @status, message = @message
 `);
 const resolveBySourceStmt = db.prepare(`UPDATE alerts SET status = 'resolved' WHERE source_key = ? AND status = 'active'`);
-const getByIdStmt = db.prepare(`SELECT status, last_notified_at, notified_active FROM alerts WHERE id = ?`);
+const getByIdStmt = db.prepare(`SELECT status, last_notified_at, notified_active, last_call_at, call_active FROM alerts WHERE id = ?`);
 const getActiveBySourceStmt = db.prepare(`SELECT id, message, notified_active FROM alerts WHERE source_key = ? AND status = 'active'`);
 const touchNotifiedStmt = db.prepare(`UPDATE alerts SET last_notified_at = ?, notified_active = 1 WHERE id = ?`);
 const clearNotifiedStmt = db.prepare(`UPDATE alerts SET notified_active = 0 WHERE id = ?`);
+const touchCalledStmt = db.prepare(`UPDATE alerts SET last_call_at = ?, call_active = 1 WHERE id = ?`);
+const clearCalledStmt = db.prepare(`UPDATE alerts SET call_active = 0 WHERE id = ?`);
 const listStmt = db.prepare(`SELECT * FROM alerts ORDER BY created_at DESC LIMIT 100`);
 const countActiveStmt = db.prepare(`SELECT COUNT(*) AS n FROM alerts WHERE status = 'active'`);
 
@@ -70,6 +73,35 @@ function reminderIntervalMs(critical) {
   return minutes > 0 ? minutes * 60 * 1000 : 0;
 }
 
+// Cadência da ligação Twilio — própria, independente do lembrete do
+// Telegram acima (ligação é bem mais intrusiva/cara que mensagem).
+function callIntervalMs() {
+  const minutes = Number(getSettings().twilioCallReminderIntervalMinutes) || 0;
+  return minutes > 0 ? minutes * 60 * 1000 : 0;
+}
+
+// Liga pra equipamento crítico que ficou OFFLINE — nunca pra degradado, nunca
+// pra "voltou online" (o pedido era só avisar que caiu). Mesma mecânica do
+// notify() do Telegram (1ª vez dispara na hora, repete só no intervalo
+// configurado), mas com suas próprias colunas (last_call_at/call_active) pra
+// não competir com a cadência do Telegram.
+function maybeCallCritical(id, existing, justActivated) {
+  if (justActivated) {
+    if (canNotify(existing?.last_call_at, NOTIFY_COOLDOWN_MS)) {
+      makeCriticalCall();
+      touchCalledStmt.run(new Date().toISOString(), id);
+    } else {
+      clearCalledStmt.run(id);
+    }
+  } else if (existing && existing.status === 'active' && existing.call_active) {
+    const interval = callIntervalMs();
+    if (interval > 0 && canNotify(existing.last_call_at, interval)) {
+      makeCriticalCall();
+      touchCalledStmt.run(new Date().toISOString(), id);
+    }
+  }
+}
+
 function typeLabel(type) {
   const labels = { nvr: 'NVR', camera: 'Câmera', porteiro: 'Porteiro', interfone: 'Interfone', switch: 'Switch', ap: 'AP', servidor: 'Servidor', outro: 'Equipamento' };
   return labels[type] || 'Equipamento';
@@ -103,7 +135,21 @@ const criticalPrefix = (device) => (device.critical ? '🚨 CRÍTICO — ' : '')
 export function raiseDeviceOffline(device) {
   const sourceKey = `device-offline-${device.id}`;
   const message = `${criticalPrefix(device)}${deviceLabel(device)} ficou OFFLINE (sem resposta de ping)`;
+
+  // A LEITURA precisa ser ANTES do upsertAlert sobrescrever `status` — é ela
+  // que diz se é a primeira vez que este alerta fica ativo (liga agora) ou
+  // se já estava ativo (só liga de novo se bateu o intervalo configurado).
+  // Mas a ESCRITA (dentro de maybeCallCritical) só pode acontecer DEPOIS do
+  // upsertAlert, porque na primeiríssima vez a linha ainda nem existe na
+  // tabela — um UPDATE antes disso não daria erro, só silenciosamente não
+  // afetaria nenhuma linha (e o INSERT do upsertAlert, logo em seguida,
+  // sobrescreveria tudo com os valores padrão mesmo assim).
+  const existing = device.critical ? getByIdStmt.get(sourceKey) : null;
+  const justActivated = !existing || existing.status === 'resolved';
+
   upsertAlert({ id: sourceKey, severity: 'critical', message, status: 'active', source_key: sourceKey, critical: device.critical }, reminderIntervalMs(device.critical));
+
+  if (device.critical) maybeCallCritical(sourceKey, existing, justActivated);
 }
 
 export function resolveDeviceOffline(device, offlineSinceMs) {

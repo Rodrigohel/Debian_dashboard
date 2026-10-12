@@ -28,6 +28,23 @@ const DEFAULTS = {
   // direto pro responsável de plantão sem depender de alguém ver o grupo
   // geral. Vazio = críticos vão só pro Chat ID principal, igual os outros.
   telegramChatIdCritical: process.env.TELEGRAM_CHAT_ID_CRITICAL || '',
+
+  // Ligação telefônica via Twilio (opcional, além do Telegram, nunca no
+  // lugar dele) — só pra equipamento crítico que ficou OFFLINE. 'false' por
+  // padrão: sem credenciais configuradas, nada muda pra quem já usa só
+  // Telegram.
+  twilioCallEnabled: 'false',
+  twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',
+  twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
+  // Número Twilio que origina a ligação (formato E.164, ex.: +14155551234).
+  twilioFromNumber: process.env.TWILIO_FROM_NUMBER || '',
+  // Número que recebe a ligação quando um equipamento crítico cai (E.164).
+  twilioToNumberCritical: process.env.TWILIO_TO_NUMBER_CRITICAL || '',
+  // Enquanto o equipamento crítico continuar offline, liga de novo a cada
+  // tantos minutos — independente do lembrete do Telegram acima (cadência
+  // própria, porque ligação é bem mais intrusiva/cara que mensagem). 0 liga
+  // só uma vez, quando cai.
+  twilioCallReminderIntervalMinutes: String(process.env.TWILIO_CALL_REMINDER_INTERVAL_MINUTES || 30),
   // 'off' | 'weekly' | 'monthly' — envia o relatório executivo em PDF
   // automaticamente pelo Telegram já configurado (ver executiveReportScheduler).
   executiveReportFrequency: process.env.EXECUTIVE_REPORT_FREQUENCY || 'off',

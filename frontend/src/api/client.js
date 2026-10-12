@@ -146,6 +146,7 @@ export const api = {
   settings: () => request('/api/settings'),
   updateSettings: (partial) => request('/api/settings', { method: 'PUT', body: JSON.stringify(partial) }),
   testTelegram: (partial) => request('/api/settings/telegram/test', { method: 'POST', body: JSON.stringify(partial) }),
+  testTwilio: (partial) => request('/api/settings/twilio/test', { method: 'POST', body: JSON.stringify(partial) }),
   uploadLogo: async (file) => {
     const token = getToken();
     const form = new FormData();

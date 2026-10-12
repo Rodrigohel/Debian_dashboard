@@ -103,21 +103,28 @@ async function checkDevice(device, settings, arpTable) {
   // mexe fisicamente no equipamento (ex.: troca de câmera, reboot manual).
   const inMaintenance = device.maintenanceUntil && new Date(device.maintenanceUntil) > new Date();
 
-  if (previousStatus !== status) {
-    if (status === 'offline') {
-      insertEventStmt.run(device.id, 'went_offline', now);
-      if (!inMaintenance) raiseDeviceOffline(device);
-    } else if (previousStatus === 'offline') {
-      insertEventStmt.run(device.id, 'went_online', now);
-      if (!inMaintenance) resolveDeviceOffline(device, device.lastOfflineAt ? new Date(device.lastOfflineAt).getTime() : null);
-    }
+  // raiseDeviceOffline/raiseDeviceDegraded rodam em TODA rodada em que o
+  // dispositivo continua nesse estado (não só na transição) — é assim que o
+  // lembrete periódico (Telegram e, pra equipamento crítico, a ligação
+  // Twilio) consegue reenviar enquanto o problema persiste. upsertAlert, por
+  // dentro, já sabe distinguir "acabou de cair" de "continua caído" e only
+  // dispara de novo quando o intervalo configurado permite — chamar toda
+  // rodada é seguro (não duplica evento nem manda mensagem de mais).
+  // insertEventStmt (histórico de queda/recuperação) e os resolve continuam
+  // só na transição de verdade, como sempre foi.
+  if (status === 'offline') {
+    if (previousStatus !== status) insertEventStmt.run(device.id, 'went_offline', now);
+    if (!inMaintenance) raiseDeviceOffline(device);
+  } else if (previousStatus === 'offline' && previousStatus !== status) {
+    insertEventStmt.run(device.id, 'went_online', now);
+    if (!inMaintenance) resolveDeviceOffline(device, device.lastOfflineAt ? new Date(device.lastOfflineAt).getTime() : null);
+  }
 
-    if (status === 'degraded' && previousStatus !== 'offline') {
-      insertEventStmt.run(device.id, 'degraded', now);
-      if (!inMaintenance) raiseDeviceDegraded(device);
-    } else if (previousStatus === 'degraded' && status === 'online') {
-      if (!inMaintenance) resolveDeviceDegraded(device);
-    }
+  if (status === 'degraded' && previousStatus !== 'offline') {
+    if (previousStatus !== status) insertEventStmt.run(device.id, 'degraded', now);
+    if (!inMaintenance) raiseDeviceDegraded(device);
+  } else if (previousStatus === 'degraded' && status === 'online') {
+    if (!inMaintenance) resolveDeviceDegraded(device);
   }
 
   return { ...device, status, latencyMs: ping.latencyMs, lastCheckAt: now, mac, vendor };

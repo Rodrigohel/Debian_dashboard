@@ -4,6 +4,7 @@ import path from 'node:path';
 import multer from 'multer';
 import { getSettings, setSettings } from '../services/settingsService.js';
 import { sendTelegramMessageWith } from '../services/telegramService.js';
+import { makeTwilioCallWith } from '../services/twilioService.js';
 import { logAudit } from '../services/auditService.js';
 
 export const settingsRouter = Router();
@@ -42,6 +43,7 @@ settingsRouter.put('/', (req, res) => {
     networkBase, networkHistoryRetentionHours, telegramBotToken, telegramChatId, telegramChatIdCritical, executiveReportFrequency,
     backupEnabled, backupRetentionDays, loginMaxAttempts, loginAttemptWindowMinutes, loginLockoutMinutes,
     heartbeatEnabled, heartbeatFrequencyHours,
+    twilioCallEnabled, twilioAccountSid, twilioAuthToken, twilioFromNumber, twilioToNumberCritical, twilioCallReminderIntervalMinutes,
   } = req.body || {};
   const updates = {};
 
@@ -140,6 +142,28 @@ settingsRouter.put('/', (req, res) => {
     updates.heartbeatFrequencyHours = n;
   }
 
+  if (twilioCallEnabled !== undefined) updates.twilioCallEnabled = twilioCallEnabled ? 'true' : 'false';
+  if (typeof twilioAccountSid === 'string') updates.twilioAccountSid = twilioAccountSid.trim();
+  if (typeof twilioAuthToken === 'string') updates.twilioAuthToken = twilioAuthToken.trim();
+
+  const E164 = /^\+[1-9]\d{6,14}$/;
+  if (typeof twilioFromNumber === 'string') {
+    const v = twilioFromNumber.trim();
+    if (v && !E164.test(v)) return res.status(400).json({ error: 'Número de origem Twilio inválido — use o formato internacional E.164, ex.: +14155551234.' });
+    updates.twilioFromNumber = v;
+  }
+  if (typeof twilioToNumberCritical === 'string') {
+    const v = twilioToNumberCritical.trim();
+    if (v && !E164.test(v)) return res.status(400).json({ error: 'Número a ligar (crítico) inválido — use o formato internacional E.164, ex.: +5511987654321.' });
+    updates.twilioToNumberCritical = v;
+  }
+
+  if (twilioCallReminderIntervalMinutes !== undefined) {
+    const n = Number(twilioCallReminderIntervalMinutes);
+    if (!Number.isFinite(n) || n < 0) return res.status(400).json({ error: 'Intervalo de ligação repetida deve ser um número de minutos (0 liga só uma vez).' });
+    updates.twilioCallReminderIntervalMinutes = n;
+  }
+
   const result = setSettings(updates);
   logAudit({ username: req.user?.username, action: 'settings.update', details: `Configurações atualizadas (${Object.keys(updates).join(', ') || 'nenhum campo'})` });
   res.json(result);
@@ -158,6 +182,22 @@ settingsRouter.post('/telegram/test', async (req, res) => {
     botToken, chatId,
     '🔔 Teste do painel de rede — se você recebeu esta mensagem, a notificação está configurada corretamente!',
   );
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json({ ok: true });
+});
+
+settingsRouter.post('/twilio/test', async (req, res) => {
+  const current = getSettings();
+  const accountSid = String(req.body?.twilioAccountSid ?? current.twilioAccountSid ?? '').trim();
+  const authToken = String(req.body?.twilioAuthToken ?? current.twilioAuthToken ?? '').trim();
+  const fromNumber = String(req.body?.twilioFromNumber ?? current.twilioFromNumber ?? '').trim();
+  const toNumber = String(req.body?.twilioToNumberCritical ?? current.twilioToNumberCritical ?? '').trim();
+
+  if (!accountSid || !authToken || !fromNumber || !toNumber) {
+    return res.status(400).json({ error: 'Preencha Account SID, Auth Token, número de origem e número a ligar antes de testar.' });
+  }
+
+  const result = await makeTwilioCallWith(accountSid, authToken, fromNumber, toNumber);
   if (!result.ok) return res.status(400).json({ error: result.error });
   res.json({ ok: true });
 });
