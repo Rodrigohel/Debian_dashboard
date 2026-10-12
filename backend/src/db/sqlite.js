@@ -191,6 +191,11 @@ for (const [column, ddl] of [
   // acesso web (ver cryptoService).
   ['sip_username', "ALTER TABLE devices ADD COLUMN sip_username TEXT NOT NULL DEFAULT ''"],
   ['sip_password_enc', "ALTER TABLE devices ADD COLUMN sip_password_enc TEXT NOT NULL DEFAULT ''"],
+  // Equipamento marcado como crítico recebe lembrete de alerta mais frequente
+  // e, se configurado, também vai pro Chat ID dedicado de críticos (ver
+  // alertsService/telegramService) — tudo opt-in, default 0 não muda nada
+  // pra quem já tem dispositivo cadastrado.
+  ['critical', 'ALTER TABLE devices ADD COLUMN critical INTEGER NOT NULL DEFAULT 0'],
 ]) {
   if (!deviceColumns.includes(column)) db.exec(ddl);
 }

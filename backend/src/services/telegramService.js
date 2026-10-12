@@ -32,13 +32,23 @@ export async function sendTelegramMessageWith(botToken, chatId, text) {
 // Notificação de alertas via Telegram — opcional, só ativa se o token e o
 // chat_id estiverem configurados (tela de Configurações, ou TELEGRAM_BOT_TOKEN
 // / TELEGRAM_CHAT_ID no .env como valor inicial).
-export async function sendTelegramMessage(text) {
-  const { telegramBotToken: botToken, telegramChatId: chatId } = getSettings();
-  if (!botToken || !chatId) return;
+//
+// `critical: true` manda a mesma mensagem TAMBÉM pro Chat ID dedicado de
+// críticos (telegramChatIdCritical), se configurado — além do Chat ID
+// principal, nunca no lugar dele, pra ninguém que acompanha o grupo geral
+// deixar de ver o alerta só porque é crítico.
+export async function sendTelegramMessage(text, { critical = false } = {}) {
+  const { telegramBotToken: botToken, telegramChatId: chatId, telegramChatIdCritical } = getSettings();
+  if (!botToken) return;
 
-  const result = await sendTelegramMessageWith(botToken, chatId, text);
-  if (!result.ok) {
-    console.error('[telegram] falha ao enviar alerta:', result.error);
+  const targets = [chatId, ...(critical && telegramChatIdCritical && telegramChatIdCritical !== chatId ? [telegramChatIdCritical] : [])]
+    .filter(Boolean);
+
+  for (const target of targets) {
+    const result = await sendTelegramMessageWith(botToken, target, text);
+    if (!result.ok) {
+      console.error(`[telegram] falha ao enviar alerta para ${target}:`, result.error);
+    }
   }
 }
 

@@ -124,6 +124,7 @@ export default function DeviceDetailModal({
     mac: device.mac || '', vendor: device.vendor || '', model: device.model || '', serialNumber: device.serialNumber || '',
     username: device.username || '', password: device.password || '',
     sipUsername: device.sipUsername || '', sipPassword: device.sipPassword || '',
+    critical: device.critical || false,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -230,19 +231,25 @@ export default function DeviceDetailModal({
         )}
 
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
           background: colors.bgCardAlt, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '12px 14px', marginBottom: 18,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 10, background: colors.bgCard, border: `1px solid ${colors.border}`, flexShrink: 0 }}>
-            <Icon paths={(TYPE_META[form.type] || TYPE_META.outro).icon} size={18} color={colors.primary} strokeWidth={2} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 10, background: colors.bgCard, border: `1px solid ${colors.border}`, flexShrink: 0 }}>
+              <Icon paths={(TYPE_META[form.type] || TYPE_META.outro).icon} size={18} color={colors.primary} strokeWidth={2} />
+            </div>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>Tipo de equipamento</label>
+              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} style={{ width: '100%', maxWidth: 320, padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5, fontWeight: 600 }}>
+                {Object.entries(TYPE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
+              </select>
+            </div>
+            <div style={{ fontSize: 11, color: colors.textTertiary, maxWidth: 240 }}>Define quais campos aparecem abaixo (ex.: credenciais SIP só pra Interfone).</div>
           </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 5 }}>Tipo de equipamento</label>
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} style={{ width: '100%', maxWidth: 320, padding: '9px 11px', borderRadius: 9, border: `1px solid ${colors.border}`, fontSize: 13.5, fontWeight: 600 }}>
-              {Object.entries(TYPE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
-            </select>
-          </div>
-          <div style={{ fontSize: 11, color: colors.textTertiary, maxWidth: 240 }}>Define quais campos aparecem abaixo (ex.: credenciais SIP só pra Interfone).</div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12.5, fontWeight: 700, color: form.critical ? colors.red : colors.textSecondary, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${colors.border}`, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.critical} onChange={(e) => setForm({ ...form, critical: e.target.checked })} />
+            🚨 Equipamento crítico
+            <span style={{ fontWeight: 400, color: colors.textTertiary }}>— lembrete de alerta mais frequente e, se configurado, aviso também pro Chat ID dedicado de críticos (Configurações → Notificações)</span>
+          </label>
         </div>
 
         <div className="field-grid-2" style={{ marginBottom: 18 }}>

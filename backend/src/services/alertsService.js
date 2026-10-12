@@ -30,18 +30,18 @@ function canNotify(lastNotifiedAt, intervalMs) {
   return Date.now() - new Date(lastNotifiedAt).getTime() >= intervalMs;
 }
 
-function notify(id, text) {
-  sendTelegramMessage(text);
+function notify(id, text, critical) {
+  sendTelegramMessage(text, { critical });
   touchNotifiedStmt.run(new Date().toISOString(), id);
 }
 
-function upsertAlert({ id, severity, message, status, source_key }, reminderIntervalMs = 0) {
+function upsertAlert({ id, severity, message, status, source_key, critical }, reminderIntervalMs = 0) {
   const existing = getByIdStmt.get(id);
   upsertStmt.run({ id, severity, message, created_at: new Date().toISOString(), status, source_key });
   const justActivated = status === 'active' && (!existing || existing.status === 'resolved');
   if (justActivated) {
     if (canNotify(existing?.last_notified_at, NOTIFY_COOLDOWN_MS)) {
-      notify(id, `${SEVERITY_EMOJI[severity] || '⚠️'} ${message}`);
+      notify(id, `${SEVERITY_EMOJI[severity] || '⚠️'} ${message}`, critical);
     } else {
       clearNotifiedStmt.run(id);
     }
@@ -49,21 +49,24 @@ function upsertAlert({ id, severity, message, status, source_key }, reminderInte
     status === 'active' && existing && existing.status === 'active' && existing.notified_active &&
     reminderIntervalMs > 0 && canNotify(existing.last_notified_at, reminderIntervalMs)
   ) {
-    notify(id, `🔁 Ainda ativo: ${message}`);
+    notify(id, `🔁 Ainda ativo: ${message}`, critical);
   }
 }
 
-function resolveAlert(sourceKey, resolvedMessage) {
+function resolveAlert(sourceKey, resolvedMessage, critical) {
   const activeAlert = getActiveBySourceStmt.get(sourceKey);
   const info = resolveBySourceStmt.run(sourceKey);
   if (info.changes > 0 && activeAlert && activeAlert.notified_active) {
-    notify(activeAlert.id, `✅ ${resolvedMessage || `Resolvido: ${activeAlert.message}`}`);
+    notify(activeAlert.id, `✅ ${resolvedMessage || `Resolvido: ${activeAlert.message}`}`, critical);
     clearNotifiedStmt.run(activeAlert.id);
   }
 }
 
-function reminderIntervalMs() {
-  const minutes = Number(getSettings().alertReminderIntervalMinutes) || 0;
+// Equipamento crítico reenvia o lembrete de "ainda ativo" num intervalo
+// próprio (normalmente mais curto) — ver Configurações → Notificações.
+function reminderIntervalMs(critical) {
+  const key = critical ? 'alertReminderIntervalMinutesCritical' : 'alertReminderIntervalMinutes';
+  const minutes = Number(getSettings()[key]) || 0;
   return minutes > 0 ? minutes * 60 * 1000 : 0;
 }
 
@@ -93,27 +96,31 @@ function formatDuration(ms) {
 // estado (o monitor já sabe, no momento em que checa, se um dispositivo
 // mudou de estado — não precisa de uma varredura periódica separada). ---
 
+// Prefixo visual pra um equipamento crítico se destacar mesmo dentro do
+// mesmo chat/grupo onde chegam alertas de equipamento normal também.
+const criticalPrefix = (device) => (device.critical ? '🚨 CRÍTICO — ' : '');
+
 export function raiseDeviceOffline(device) {
   const sourceKey = `device-offline-${device.id}`;
-  const message = `${deviceLabel(device)} ficou OFFLINE (sem resposta de ping)`;
-  upsertAlert({ id: sourceKey, severity: 'critical', message, status: 'active', source_key: sourceKey }, reminderIntervalMs());
+  const message = `${criticalPrefix(device)}${deviceLabel(device)} ficou OFFLINE (sem resposta de ping)`;
+  upsertAlert({ id: sourceKey, severity: 'critical', message, status: 'active', source_key: sourceKey, critical: device.critical }, reminderIntervalMs(device.critical));
 }
 
 export function resolveDeviceOffline(device, offlineSinceMs) {
   const sourceKey = `device-offline-${device.id}`;
   const duration = offlineSinceMs ? ` após ${formatDuration(Date.now() - offlineSinceMs)} offline` : '';
-  resolveAlert(sourceKey, `${deviceLabel(device)} voltou ONLINE${duration}`);
+  resolveAlert(sourceKey, `${criticalPrefix(device)}${deviceLabel(device)} voltou ONLINE${duration}`, device.critical);
 }
 
 export function raiseDeviceDegraded(device) {
   const sourceKey = `device-degraded-${device.id}`;
-  const message = `${deviceLabel(device)} responde ping mas o(s) serviço(s) na(s) porta(s) configurada(s) não respondem`;
-  upsertAlert({ id: sourceKey, severity: 'warning', message, status: 'active', source_key: sourceKey }, reminderIntervalMs());
+  const message = `${criticalPrefix(device)}${deviceLabel(device)} responde ping mas o(s) serviço(s) na(s) porta(s) configurada(s) não respondem`;
+  upsertAlert({ id: sourceKey, severity: 'warning', message, status: 'active', source_key: sourceKey, critical: device.critical }, reminderIntervalMs(device.critical));
 }
 
 export function resolveDeviceDegraded(device) {
   const sourceKey = `device-degraded-${device.id}`;
-  resolveAlert(sourceKey, `${deviceLabel(device)} voltou a responder normalmente`);
+  resolveAlert(sourceKey, `${criticalPrefix(device)}${deviceLabel(device)} voltou a responder normalmente`, device.critical);
 }
 
 function rowToAlert(row) {

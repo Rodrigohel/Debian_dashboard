@@ -16,9 +16,18 @@ const DEFAULTS = {
   offlineThresholdFails: String(config.monitor.offlineThresholdFails),
   networkBase: config.networkBase,
   networkHistoryRetentionHours: String(process.env.NETWORK_HISTORY_RETENTION_HOURS || 168),
+  // Lembrete de alerta ainda ativo — equipamento "normal" (não marcado como
+  // crítico no cadastro). Equipamento crítico usa o intervalo de baixo,
+  // tipicamente mais curto, pra escalar mais rápido.
   alertReminderIntervalMinutes: String(process.env.ALERT_REMINDER_INTERVAL_MINUTES || 60),
+  alertReminderIntervalMinutesCritical: String(process.env.ALERT_REMINDER_INTERVAL_MINUTES_CRITICAL || 15),
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
+  // Opcional: além do Chat ID acima, manda os alertas de equipamento crítico
+  // TAMBÉM pra esse chat (pessoa, grupo ou canal separado) — pra escalar
+  // direto pro responsável de plantão sem depender de alguém ver o grupo
+  // geral. Vazio = críticos vão só pro Chat ID principal, igual os outros.
+  telegramChatIdCritical: process.env.TELEGRAM_CHAT_ID_CRITICAL || '',
   // 'off' | 'weekly' | 'monthly' — envia o relatório executivo em PDF
   // automaticamente pelo Telegram já configurado (ver executiveReportScheduler).
   executiveReportFrequency: process.env.EXECUTIVE_REPORT_FREQUENCY || 'off',

@@ -38,7 +38,8 @@ settingsRouter.get('/', (req, res) => {
 settingsRouter.put('/', (req, res) => {
   const {
     companyName, siteName, pingIntervalSeconds, pingTimeoutMs, offlineThresholdFails, alertReminderIntervalMinutes,
-    networkBase, networkHistoryRetentionHours, telegramBotToken, telegramChatId, executiveReportFrequency,
+    alertReminderIntervalMinutesCritical,
+    networkBase, networkHistoryRetentionHours, telegramBotToken, telegramChatId, telegramChatIdCritical, executiveReportFrequency,
     backupEnabled, backupRetentionDays, loginMaxAttempts, loginAttemptWindowMinutes, loginLockoutMinutes,
     heartbeatEnabled, heartbeatFrequencyHours,
   } = req.body || {};
@@ -67,8 +68,14 @@ settingsRouter.put('/', (req, res) => {
 
   if (alertReminderIntervalMinutes !== undefined) {
     const n = Number(alertReminderIntervalMinutes);
-    if (!Number.isFinite(n) || n < 0) return res.status(400).json({ error: 'Intervalo de lembrete deve ser um número de minutos (0 desativa).' });
+    if (!Number.isFinite(n) || n < 0) return res.status(400).json({ error: 'Intervalo de lembrete (equipamento normal) deve ser um número de minutos (0 desativa).' });
     updates.alertReminderIntervalMinutes = n;
+  }
+
+  if (alertReminderIntervalMinutesCritical !== undefined) {
+    const n = Number(alertReminderIntervalMinutesCritical);
+    if (!Number.isFinite(n) || n < 0) return res.status(400).json({ error: 'Intervalo de lembrete (equipamento crítico) deve ser um número de minutos (0 desativa).' });
+    updates.alertReminderIntervalMinutesCritical = n;
   }
 
   if (networkBase !== undefined) {
@@ -90,6 +97,7 @@ settingsRouter.put('/', (req, res) => {
 
   if (typeof telegramBotToken === 'string') updates.telegramBotToken = telegramBotToken.trim();
   if (typeof telegramChatId === 'string') updates.telegramChatId = telegramChatId.trim();
+  if (typeof telegramChatIdCritical === 'string') updates.telegramChatIdCritical = telegramChatIdCritical.trim();
 
   if (executiveReportFrequency !== undefined) {
     if (!['off', 'weekly', 'monthly'].includes(executiveReportFrequency)) {

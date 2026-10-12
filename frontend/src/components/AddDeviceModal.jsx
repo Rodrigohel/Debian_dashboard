@@ -4,7 +4,7 @@ import { TYPE_META } from './Icon.jsx';
 export default function AddDeviceModal({ colors, onClose, onCreate }) {
   const [form, setForm] = useState({
     ip: '', name: '', type: 'outro', typeLabel: '', location: '', ports: '', notes: '',
-    username: '', password: '', sipUsername: '', sipPassword: '',
+    username: '', password: '', sipUsername: '', sipPassword: '', critical: false,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -42,6 +42,11 @@ export default function AddDeviceModal({ colors, onClose, onCreate }) {
               {Object.entries(TYPE_META).map(([key, meta]) => <option key={key} value={key}>{meta.label}</option>)}
             </select>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12.5, fontWeight: 700, color: form.critical ? colors.red : colors.textSecondary, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.critical} onChange={(e) => setForm({ ...form, critical: e.target.checked })} />
+            🚨 Equipamento crítico
+            <span style={{ fontWeight: 400, color: colors.textTertiary }}>— lembrete de alerta mais frequente (Configurações → Notificações)</span>
+          </label>
           <div className="field-grid-2">
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 5 }}>IP *</label>

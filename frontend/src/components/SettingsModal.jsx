@@ -71,9 +71,6 @@ function GeneralTab({ colors, form, setForm }) {
       <Field colors={colors} label="Falhas seguidas até marcar OFFLINE" hint="Evita marcar como caído por causa de 1 pacote perdido isolado.">
         <input type="number" min={1} value={form.offlineThresholdFails} onChange={(e) => setForm({ ...form, offlineThresholdFails: e.target.value })} style={inputStyle(colors)} />
       </Field>
-      <Field colors={colors} label="Lembrete de alerta ativo (min)" hint="0 desativa — manda só quando fica ativo e quando resolve.">
-        <input type="number" min={0} value={form.alertReminderIntervalMinutes} onChange={(e) => setForm({ ...form, alertReminderIntervalMinutes: e.target.value })} style={inputStyle(colors)} />
-      </Field>
 
       <SectionLabel colors={colors}>Rede</SectionLabel>
       <Field colors={colors} label="Prefixo(s) /24 usado(s) pelo 'Escanear rede'" hint="Formato: 192.168.1 (sem o último número do IP). Rede com VLANs/sub-redes separadas? Coloque vários separados por vírgula — o botão escaneia todos de uma vez (até 10). Ex.: 192.168.1,192.168.20,10.1.0">
@@ -104,6 +101,22 @@ function TelegramTab({ colors, form, setForm, onTest, testing }) {
       >
         {testing ? 'Enviando...' : 'Testar notificação'}
       </button>
+
+      <SectionLabel colors={colors}>🚨 Equipamento crítico</SectionLabel>
+      <Field colors={colors} label="Chat ID — crítico (opcional)" hint="Além do Chat ID principal acima, manda os alertas de equipamento marcado como crítico TAMBÉM pra esse chat — uma pessoa, grupo ou canal separado de plantão. Vazio = crítico vai só pro Chat ID principal, igual os outros.">
+        <input value={form.telegramChatIdCritical} onChange={(e) => setForm({ ...form, telegramChatIdCritical: e.target.value })} style={inputStyle(colors)} />
+      </Field>
+      <div className="field-grid-2">
+        <Field colors={colors} label="Lembrete — equipamento normal (min)" hint="0 desativa.">
+          <input type="number" min={0} value={form.alertReminderIntervalMinutes} onChange={(e) => setForm({ ...form, alertReminderIntervalMinutes: e.target.value })} style={inputStyle(colors)} />
+        </Field>
+        <Field colors={colors} label="Lembrete — equipamento crítico (min)" hint="0 desativa.">
+          <input type="number" min={0} value={form.alertReminderIntervalMinutesCritical} onChange={(e) => setForm({ ...form, alertReminderIntervalMinutesCritical: e.target.value })} style={inputStyle(colors)} />
+        </Field>
+      </div>
+      <div style={{ fontSize: 11.5, color: colors.textTertiary, marginTop: -6, marginBottom: 14 }}>
+        Enquanto um alerta continua ativo (equipamento não voltou), o painel reenvia um lembrete "ainda ativo" nesse intervalo — 0 manda só quando fica ativo e quando resolve, sem repetir. Marque o dispositivo como crítico no detalhe dele pra ele passar a usar o intervalo "crítico" em vez do "normal".
+      </div>
 
       <SectionLabel colors={colors}>Relatório executivo automático</SectionLabel>
       <Field colors={colors} label="Frequência de envio pelo Telegram" hint="Manda o mesmo PDF do botão 'Relatório executivo' sozinho, no bot/chat configurado acima — precisa dos dois campos preenchidos.">
@@ -567,10 +580,12 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
     pingTimeoutMs: settings.pingTimeoutMs || '1200',
     offlineThresholdFails: settings.offlineThresholdFails || '2',
     alertReminderIntervalMinutes: settings.alertReminderIntervalMinutes || '60',
+    alertReminderIntervalMinutesCritical: settings.alertReminderIntervalMinutesCritical || '15',
     networkBase: settings.networkBase || '192.168.1',
     networkHistoryRetentionHours: settings.networkHistoryRetentionHours || '168',
     telegramBotToken: settings.telegramBotToken || '',
     telegramChatId: settings.telegramChatId || '',
+    telegramChatIdCritical: settings.telegramChatIdCritical || '',
     executiveReportFrequency: settings.executiveReportFrequency || 'off',
     backupEnabled: settings.backupEnabled !== 'false',
     backupRetentionDays: settings.backupRetentionDays || '14',

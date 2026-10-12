@@ -5,14 +5,14 @@ import { getDeviceUptime } from './eventsService.js';
 export const DEVICE_TYPES = ['nvr', 'camera', 'porteiro', 'interfone', 'switch', 'ap', 'servidor', 'outro'];
 
 const insertStmt = db.prepare(`
-  INSERT INTO devices (ip, name, type, type_label, location, ports, notes, enabled, mac, vendor, model, serial_number, device_username, device_password_enc, sip_username, sip_password_enc)
-  VALUES (@ip, @name, @type, @typeLabel, @location, @ports, @notes, @enabled, @mac, @vendor, @model, @serialNumber, @deviceUsername, @devicePasswordEnc, @sipUsername, @sipPasswordEnc)
+  INSERT INTO devices (ip, name, type, type_label, location, ports, notes, enabled, mac, vendor, model, serial_number, device_username, device_password_enc, sip_username, sip_password_enc, critical)
+  VALUES (@ip, @name, @type, @typeLabel, @location, @ports, @notes, @enabled, @mac, @vendor, @model, @serialNumber, @deviceUsername, @devicePasswordEnc, @sipUsername, @sipPasswordEnc, @critical)
 `);
 const updateStmt = db.prepare(`
   UPDATE devices SET ip=@ip, name=@name, type=@type, type_label=@typeLabel, location=@location, ports=@ports, notes=@notes,
          enabled=@enabled, mac=@mac, vendor=@vendor, model=@model, serial_number=@serialNumber,
          device_username=@deviceUsername, device_password_enc=@devicePasswordEnc,
-         sip_username=@sipUsername, sip_password_enc=@sipPasswordEnc
+         sip_username=@sipUsername, sip_password_enc=@sipPasswordEnc, critical=@critical
   WHERE id=@id
 `);
 const toggleFavoriteStmt = db.prepare('UPDATE devices SET favorite = @favorite WHERE id = @id');
@@ -80,6 +80,9 @@ function rowToDevice(row) {
     // sempre, sipPassword só é descriptografado no detalhe de UM
     // dispositivo (getDevice).
     sipUsername: row.sip_username || '',
+    // Equipamento crítico: lembrete de alerta mais frequente e, se
+    // configurado, também vai pro Chat ID dedicado (ver alertsService).
+    critical: !!row.critical,
     favorite: !!row.favorite,
     maintenanceUntil: row.maintenance_until || null,
     floorId: row.floor_id ?? null,
@@ -142,6 +145,7 @@ export function createDevice(input) {
     devicePasswordEnc: input.password ? encryptSecret(String(input.password)) : '',
     sipUsername: String(input.sipUsername || '').trim(),
     sipPasswordEnc: input.sipPassword ? encryptSecret(String(input.sipPassword)) : '',
+    critical: input.critical ? 1 : 0,
   });
   ensureStatusStmt.run(info.lastInsertRowid);
   return getDevice(info.lastInsertRowid);
@@ -181,6 +185,7 @@ export function updateDevice(id, input) {
     sipPasswordEnc: input.sipPassword !== undefined
       ? (input.sipPassword ? encryptSecret(String(input.sipPassword)) : '')
       : existing.sip_password_enc,
+    critical: input.critical === undefined ? existing.critical : (input.critical ? 1 : 0),
   });
   return getDevice(id);
 }
