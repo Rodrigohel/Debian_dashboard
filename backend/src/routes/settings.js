@@ -4,7 +4,7 @@ import path from 'node:path';
 import multer from 'multer';
 import { getSettings, setSettings } from '../services/settingsService.js';
 import { sendTelegramMessageWith } from '../services/telegramService.js';
-import { makeTwilioCallWith } from '../services/twilioService.js';
+import { makeTwilioCallsWith, parsePhoneNumbers } from '../services/twilioService.js';
 import { logAudit } from '../services/auditService.js';
 
 export const settingsRouter = Router();
@@ -153,9 +153,14 @@ settingsRouter.put('/', (req, res) => {
     updates.twilioFromNumber = v;
   }
   if (typeof twilioToNumberCritical === 'string') {
-    const v = twilioToNumberCritical.trim();
-    if (v && !E164.test(v)) return res.status(400).json({ error: 'Número a ligar (crítico) inválido — use o formato internacional E.164, ex.: +5511987654321.' });
-    updates.twilioToNumberCritical = v;
+    // Aceita um ou vários números separados por vírgula — cada um recebe sua
+    // própria ligação em paralelo quando um equipamento crítico cai (ver
+    // twilioService.makeTwilioCallsWith).
+    const numbers = parsePhoneNumbers(twilioToNumberCritical);
+    if (!numbers.every((n) => E164.test(n))) {
+      return res.status(400).json({ error: 'Número a ligar (crítico) inválido — use o formato internacional E.164 (ex.: +5511987654321), um ou vários separados por vírgula.' });
+    }
+    updates.twilioToNumberCritical = numbers.join(',');
   }
 
   if (twilioCallReminderIntervalMinutes !== undefined) {
@@ -191,15 +196,20 @@ settingsRouter.post('/twilio/test', async (req, res) => {
   const accountSid = String(req.body?.twilioAccountSid ?? current.twilioAccountSid ?? '').trim();
   const authToken = String(req.body?.twilioAuthToken ?? current.twilioAuthToken ?? '').trim();
   const fromNumber = String(req.body?.twilioFromNumber ?? current.twilioFromNumber ?? '').trim();
-  const toNumber = String(req.body?.twilioToNumberCritical ?? current.twilioToNumberCritical ?? '').trim();
+  const toNumbers = String(req.body?.twilioToNumberCritical ?? current.twilioToNumberCritical ?? '').trim();
 
-  if (!accountSid || !authToken || !fromNumber || !toNumber) {
-    return res.status(400).json({ error: 'Preencha Account SID, Auth Token, número de origem e número a ligar antes de testar.' });
+  if (!accountSid || !authToken || !fromNumber || !toNumbers) {
+    return res.status(400).json({ error: 'Preencha Account SID, Auth Token, número de origem e ao menos um número a ligar antes de testar.' });
   }
 
-  const result = await makeTwilioCallWith(accountSid, authToken, fromNumber, toNumber);
-  if (!result.ok) return res.status(400).json({ error: result.error });
-  res.json({ ok: true });
+  // Testa TODOS os números configurados (não só o primeiro) — assim o
+  // administrador descobre na hora se algum número da lista está errado.
+  const results = await makeTwilioCallsWith(accountSid, authToken, fromNumber, toNumbers);
+  const failed = results.filter((r) => !r.ok);
+  if (failed.length > 0) {
+    return res.status(400).json({ error: failed.map((r) => `${r.toNumber}: ${r.error}`).join(' | ') });
+  }
+  res.json({ ok: true, calledNumbers: results.map((r) => r.toNumber) });
 });
 
 settingsRouter.post('/logo', (req, res) => {

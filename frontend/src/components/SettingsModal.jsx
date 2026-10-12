@@ -121,10 +121,10 @@ function TelegramTab({ colors, form, setForm, onTest, testing, onTestCall, testi
       <SectionLabel colors={colors}>📞 Ligação (Twilio) — opcional, além do Telegram</SectionLabel>
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: colors.textSecondary, marginBottom: 12, cursor: 'pointer' }}>
         <input type="checkbox" checked={form.twilioCallEnabled} onChange={(e) => setForm({ ...form, twilioCallEnabled: e.target.checked })} />
-        Ligar pro número abaixo quando um equipamento crítico ficar OFFLINE
+        Ligar pros números abaixo quando um equipamento crítico ficar OFFLINE
       </label>
       <div style={{ fontSize: 11.5, color: colors.textTertiary, marginTop: -6, marginBottom: 12 }}>
-        Chamada de verdade pela rede telefônica (a pessoa não precisa instalar nada, só atender o celular normal) — não fala nada, só toca e desliga, pra chamar atenção mesmo se ninguém estiver olhando o Telegram. Nunca substitui a mensagem acima, só soma. Precisa de uma conta Twilio (twilio.com) com créditos.
+        Chamada de verdade pela rede telefônica (a pessoa não precisa instalar nada, só atender o celular normal) — não dá pra atender de verdade: assim que a pessoa atende, a ligação cai sozinha na hora (ninguém conversa, só serve pra chamar atenção). Nunca substitui a mensagem acima, só soma. Precisa de uma conta Twilio (twilio.com) com créditos.
       </div>
       <div className="field-grid-2">
         <Field colors={colors} label="Account SID">
@@ -134,14 +134,12 @@ function TelegramTab({ colors, form, setForm, onTest, testing, onTestCall, testi
           <input type="password" value={form.twilioAuthToken} onChange={(e) => setForm({ ...form, twilioAuthToken: e.target.value })} style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
         </Field>
       </div>
-      <div className="field-grid-2">
-        <Field colors={colors} label="Número de origem (Twilio)" hint="Formato internacional. Ex.: +14155551234">
-          <input value={form.twilioFromNumber} onChange={(e) => setForm({ ...form, twilioFromNumber: e.target.value })} placeholder="+14155551234" style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
-        </Field>
-        <Field colors={colors} label="Número a ligar (crítico)" hint="Formato internacional. Ex.: +5511987654321">
-          <input value={form.twilioToNumberCritical} onChange={(e) => setForm({ ...form, twilioToNumberCritical: e.target.value })} placeholder="+5511987654321" style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
-        </Field>
-      </div>
+      <Field colors={colors} label="Número de origem (Twilio)" hint="Formato internacional. Ex.: +14155551234 — um só, é o número que a Twilio te dá.">
+        <input value={form.twilioFromNumber} onChange={(e) => setForm({ ...form, twilioFromNumber: e.target.value })} placeholder="+14155551234" style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
+      </Field>
+      <Field colors={colors} label="Números a ligar (crítico)" hint="Um ou vários, separados por vírgula — todos tocam ao mesmo tempo (cada um é uma ligação própria, não dá pra fazer uma só que toque em vários aparelhos). Formato internacional. Ex.: +5511987654321,+5511912345678">
+        <input value={form.twilioToNumberCritical} onChange={(e) => setForm({ ...form, twilioToNumberCritical: e.target.value })} placeholder="+5511987654321, +5511912345678" style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
+      </Field>
       <Field colors={colors} label="Ligar de novo a cada (min)" hint="Cadência própria, independente do lembrete do Telegram acima — 0 liga só uma vez, quando o equipamento crítico cai.">
         <input type="number" min={0} value={form.twilioCallReminderIntervalMinutes} onChange={(e) => setForm({ ...form, twilioCallReminderIntervalMinutes: e.target.value })} style={inputStyle(colors)} disabled={!form.twilioCallEnabled} />
       </Field>
@@ -679,11 +677,12 @@ export default function SettingsModal({ colors, settings, onClose, onSaved, curr
     setError('');
     setMessage('');
     try {
-      await api.testTwilio({
+      const res = await api.testTwilio({
         twilioAccountSid: form.twilioAccountSid, twilioAuthToken: form.twilioAuthToken,
         twilioFromNumber: form.twilioFromNumber, twilioToNumberCritical: form.twilioToNumberCritical,
       });
-      setMessage('Ligação de teste disparada — o telefone deve tocar em instantes.');
+      const count = res?.calledNumbers?.length || 1;
+      setMessage(count > 1 ? `Ligação de teste disparada pros ${count} números — devem tocar em instantes.` : 'Ligação de teste disparada — o telefone deve tocar em instantes.');
     } catch (err) {
       setError(err.message);
     } finally {
